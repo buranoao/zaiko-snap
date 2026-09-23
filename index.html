@@ -760,7 +760,7 @@
   var ID_RE = /^[A-Za-z0-9_-]{20,120}$/;
   var KEY_RE = /^[A-Za-z0-9_-]{16,80}$/;
 // ★受け口の場所（デプロイID）＝合言葉（言葉）で開く時に使う（2026-09-23 本人「どのブラウザでも開けるようにしてほしい」→「1」）。
-//   場所だけ知られても、リンクの合言葉（k）が無いと受け口は何も返さない。言葉は5回まちがえると受け口が1時間締め出す。
+//   場所だけ知られても、リンクの合言葉（k）が無いと受け口は何も返さない。言葉は5回まちがえると受け口が24時間締め出す（数字4桁でも当てられにくく）。
 var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9VgrOE-iXPDA";
 
   function byId(id) { return document.getElementById(id); }
@@ -850,7 +850,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
 
   // ---- 合言葉（言葉）で開く（2026-09-23 本人「どのブラウザでも開けるようにしてほしい」→「1」）----
   // リンク（QR）を開いていないブラウザでは、本人が決めた言葉を1回入れてもらう → 受け口が合言葉（k）を返す → この端末に覚える。
-  // ★言葉そのものは端末に残さない（覚えるのは受け口が返した k だけ）。★5回まちがえると受け口が1時間締め出す。
+  // ★言葉そのものは端末に残さない（覚えるのは受け口が返した k だけ）。★5回まちがえると受け口が24時間締め出す。全角半角・大文字小文字は受け口が同じに扱う。
   var relocking = false;
   function relock() {
     if (relocking) return;
@@ -860,7 +860,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   }
   function two(n) { return ("0" + n).slice(-2); }
   var UNLOCK_MSG = {
-    wrong_pass: function (j) { return ["合言葉が", "違います。", "あと" + (j.left || 1) + "回", "まちがえると、", "1時間", "開けなくなります"]; },
+    wrong_pass: function (j) { return ["合言葉が", "違います。", "あと" + (j.left || 1) + "回", "まちがえると、", "24時間", "開けなくなります"]; },
     locked: function (j) { var d = new Date(Number(j.until) || Date.now()); return ["まちがいが", "続いたので、", two(d.getHours()) + ":" + two(d.getMinutes()) + "まで", "開けません"]; },
     no_pass: function () { return ["合言葉が", "まだ", "決まっていません。", "パソコンで", "決めてから", "入れてください"]; },
     bad_pass: function () { return ["合言葉を", "入れてください"]; },
