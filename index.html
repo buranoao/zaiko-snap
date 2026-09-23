@@ -61,6 +61,17 @@
 
   .gate{background:var(--alert-soft); border:1px solid var(--alert); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:6px}
   .gate p{margin:0; font-size:15px}
+  /* 合言葉（言葉）で開く（2026-09-23）＝読み手は60代以上・スマホが主＝文字18px・ボタンは高さ56px */
+  .unlock{display:flex; flex-direction:column; gap:10px; margin-top:8px}
+  .unlock-label{font-size:15px; font-weight:700}
+  .unlock input[type=password], .unlock input[type=text]{width:100%; box-sizing:border-box; font-family:var(--gothic); font-size:18px; color:var(--ink); background:var(--paper); border:2px solid var(--ink); border-radius:10px; padding:12px}
+  .unlock input[type=password]:focus-visible, .unlock input[type=text]:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+  .unlock-show{display:flex; align-items:center; gap:8px; font-size:15px}
+  .unlock-show input{width:22px; height:22px; margin:0}
+  .unlock button{min-height:56px; border:3px solid var(--ink); border-radius:12px; background:var(--accent); color:var(--on-accent); font-family:var(--gothic); font-weight:700; font-size:20px; cursor:pointer}
+  .unlock button:disabled{opacity:.55; cursor:default}
+  .gate .unlock-msg{margin:0; font-size:16px; min-height:1.6em; line-height:1.6}
+  .gate .unlock-msg[data-kind="bad"]{color:var(--alert); font-weight:700}
 
   .drop{position:relative; background:var(--card); border:2px dashed var(--rule); border-radius:14px; padding:22px 20px 24px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; transition:border-color .15s, background .15s}
   .drop.on{border-color:var(--accent); background:var(--accent-soft)}
@@ -478,8 +489,15 @@
   </nav>
 
   <section class="gate" id="gate" hidden>
-    <h2>リンクから<wbr>開いてください</h2>
-    <p>このページは、<wbr>送られてきた<wbr>リンク（QRコード）から<wbr>開くと<wbr>使えます。</p>
+    <h2>合言葉を<wbr>入れてください</h2>
+    <p>はじめて<wbr>開くブラウザでは、<wbr>決めてある<wbr>合言葉を<wbr>1回だけ<wbr>入れてください。<wbr>次からは<wbr>開くだけで<wbr>使えます。</p>
+    <form class="unlock" id="unlock" autocomplete="off" novalidate>
+      <label class="unlock-label" for="unlock-pass">合言葉</label>
+      <input id="unlock-pass" type="password" maxlength="100" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <label class="unlock-show"><input type="checkbox" id="unlock-show">文字を<wbr>見せる</label>
+      <button type="submit" id="unlock-go">開く</button>
+      <p class="unlock-msg" id="unlock-msg" role="status" aria-live="polite"></p>
+    </form>
   </section>
 
   <div class="pane" id="pane-home" hidden>
@@ -741,6 +759,9 @@
   var PARALLEL = 1;      // 1枚ずつ送る（受け口は1枚ずつしか受け取れないので、同時に送ると待ち時間が伸びる）
   var ID_RE = /^[A-Za-z0-9_-]{20,120}$/;
   var KEY_RE = /^[A-Za-z0-9_-]{16,80}$/;
+// ★受け口の場所（デプロイID）＝合言葉（言葉）で開く時に使う（2026-09-23 本人「どのブラウザでも開けるようにしてほしい」→「1」）。
+//   場所だけ知られても、リンクの合言葉（k）が無いと受け口は何も返さない。言葉は5回まちがえると受け口が1時間締め出す。
+var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9VgrOE-iXPDA";
 
   function byId(id) { return document.getElementById(id); }
   var statusEl = byId("status"), statusText = byId("status-text");
@@ -814,6 +835,7 @@
         if (!j) throw fail("network");
         // 受け口がまだ古い版（その問い合わせを知らない）＝電波のせいではない（2026-09-14 ページだけ先に新しくなった夜に実害の手前）
         if (!j.ok) {
+          if (j.error === "not_allowed") relock();   // 覚えている合言葉が断られた＝合言葉が変わった → 言葉を入れる画面へ（2026-09-23）
           var er = fail(HARD.indexOf(j.error) !== -1 ? j.error : (j.error === "unknown op" ? "old_server" : "server"));
           if (j.order) er.order = j.order;   // 断られた時のお願いの今の姿（取り消しが2本目で断られても、1本目で取り消せていたかが分かる・2026-09-16）
           throw er;
@@ -824,6 +846,86 @@
       stop();
       throw fail("network");
     });
+  }
+
+  // ---- 合言葉（言葉）で開く（2026-09-23 本人「どのブラウザでも開けるようにしてほしい」→「1」）----
+  // リンク（QR）を開いていないブラウザでは、本人が決めた言葉を1回入れてもらう → 受け口が合言葉（k）を返す → この端末に覚える。
+  // ★言葉そのものは端末に残さない（覚えるのは受け口が返した k だけ）。★5回まちがえると受け口が1時間締め出す。
+  var relocking = false;
+  function relock() {
+    if (relocking) return;
+    relocking = true;
+    try { localStorage.removeItem(STORE); } catch (e) {}
+    location.replace(location.pathname + "?relock=1");   // # の後ろ（古いリンクの合言葉）も外して開き直す
+  }
+  function two(n) { return ("0" + n).slice(-2); }
+  var UNLOCK_MSG = {
+    wrong_pass: function (j) { return ["合言葉が", "違います。", "あと" + (j.left || 1) + "回", "まちがえると、", "1時間", "開けなくなります"]; },
+    locked: function (j) { var d = new Date(Number(j.until) || Date.now()); return ["まちがいが", "続いたので、", two(d.getHours()) + ":" + two(d.getMinutes()) + "まで", "開けません"]; },
+    no_pass: function () { return ["合言葉が", "まだ", "決まっていません。", "パソコンで", "決めてから", "入れてください"]; },
+    bad_pass: function () { return ["合言葉を", "入れてください"]; },
+    not_allowed: function () { return ["まだ", "使えません。", "パソコンで", "仕上げの", "途中です"]; },
+    network: function () { return ["電波が", "弱いようです。", "もう一度", "押してください"]; }
+  };
+  function unlockOnce(p) {
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
+    var opts = { method: "POST", body: JSON.stringify({ op: "unlock", p: p }), redirect: "follow", credentials: "omit" };
+    if (ctl) opts.signal = ctl.signal;
+    function stop() { if (timer) clearTimeout(timer); }
+    return fetch("https://script.google.com/macros/s/" + HOME_D + "/exec", opts).then(function (res) {
+      return res.text().then(function (txt) {
+        stop();
+        var j = null;
+        try { j = JSON.parse(txt); } catch (e) {}
+        if (!j) throw fail("network");
+        return j;
+      });
+    }, function () {
+      stop();
+      throw fail("network");
+    });
+  }
+  function setupUnlock() {
+    var form = byId("unlock"), pass = byId("unlock-pass"), show = byId("unlock-show"), go = byId("unlock-go"), msg = byId("unlock-msg");
+    function say(kind, parts) { if (kind) msg.setAttribute("data-kind", kind); else msg.removeAttribute("data-kind"); put(msg, parts); }
+    if (/[?&]relock=1/.test(location.search)) say("bad", ["合言葉が", "変わったので、", "もう一度", "入れてください"]);
+    show.addEventListener("change", function () { pass.type = show.checked ? "text" : "password"; });
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      if (go.disabled) return;
+      var p = String(pass.value || "").trim();
+      if (!p) { say("bad", UNLOCK_MSG.bad_pass()); pass.focus(); return; }
+      go.disabled = true;
+      say("", ["確かめています…"]);
+      var n = 0;
+      (function tryOnce() {
+        n += 1;
+        unlockOnce(p).then(function (j) {
+          if (j.ok && KEY_RE.test(String(j.k || ""))) {
+            try { localStorage.setItem(STORE, JSON.stringify({ d: HOME_D, k: j.k })); } catch (e) {}
+            pass.value = "";
+            CFG = { d: HOME_D, k: j.k };
+            EXEC = "https://script.google.com/macros/s/" + CFG.d + "/exec";
+            if (window.history && history.replaceState && location.search) history.replaceState(null, "", location.pathname);
+            gate.hidden = true;
+            drop.hidden = false;
+            paneSend.hidden = false;
+            pcEl.hidden = false;
+            startApp();
+            return;
+          }
+          go.disabled = false;
+          say("bad", (UNLOCK_MSG[j.error] || UNLOCK_MSG.not_allowed)(j));
+          if (j.error === "wrong_pass") pass.select();
+        }, function () {
+          if (n < 3) return wait(800).then(tryOnce);
+          go.disabled = false;
+          say("bad", UNLOCK_MSG.network());
+        });
+      })();
+    });
+    setTimeout(function () { try { pass.focus(); } catch (e) {} }, 50);
   }
 
   // 読む問い合わせ（数・在庫）は、返事置き場が詰まる回がある（2026-09-13 16時の実測で3回に2回）。
@@ -2602,9 +2704,14 @@
     paneSend.hidden = true;
     paneHome.hidden = true;
     pcEl.hidden = true;
-    setStatus("bad", ["リンクから", "開いてください"]);
+    setStatus("bad", ["合言葉を", "入れてください"]);
+    setupUnlock();
     return;
   }
+  startApp();
+
+  // 合言葉がある時の始まり（リンク・覚えている合言葉・言葉を入れた直後のどれでも同じ・2026-09-23 に関数へまとめた）
+  function startApp() {
   tabsEl.hidden = false;
   setStatus("ok", ["写真を", "送れます"]);
   renderShots();
@@ -2630,6 +2737,7 @@
   // ページを見ている間は1分おきに、数・パソコンのClaudeの様子・写真の行方を聞き直す
   // ★お願いの一覧は、どのタブでも読む（赤枠待ちを一番上に出すため・2026-09-16）
   setInterval(function () { if (document.visibilityState === "visible") { refresh(); track(); loadOrders(); } }, 60000);
+  }
 })();
 </script>
 </body>
