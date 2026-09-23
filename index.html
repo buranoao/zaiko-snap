@@ -1,0 +1,2636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0e6b57">
+<title>在庫スナップ</title>
+<link rel="icon" href="icon-32.png" sizes="32x32">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700&family=Roboto+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --paper:#eef1ef; --card:#ffffff; --ink:#17201d; --muted:#5e6c66;
+    --rule:#ccd6d1; --accent:#0e6b57; --accent-soft:#dfeee9; --on-accent:#ffffff;
+    --alert:#a8321f; --alert-soft:#f7e7e2; --warn:#8a5700; --warn-soft:#fbefd8;
+    --shadow:0 1px 0 rgba(23,32,29,.06), 0 6px 18px -12px rgba(23,32,29,.35);
+    --mincho:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    --gothic:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    --mono:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#121715; --card:#1a211e; --ink:#e8eeeb; --muted:#93a39c;
+      --rule:#2b3733; --accent:#3fae94; --accent-soft:#16302a; --on-accent:#0b1512;
+      --alert:#e2735c; --alert-soft:#351f1a; --warn:#e3a94e; --warn-soft:#33270f;
+      --shadow:0 1px 0 rgba(0,0,0,.4), 0 8px 20px -14px rgba(0,0,0,.8);
+    }
+  }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--gothic); font-size:16px; line-height:1.75;
+    padding-inline:18px; padding-block:28px 64px;
+    -webkit-text-size-adjust:100%;
+    word-break:keep-all; overflow-wrap:break-word; line-break:strict;
+  }
+  .ph{display:inline-block}
+  .wrap{max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:20px}
+
+  .head{display:flex; flex-direction:column; gap:6px}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.18em; color:var(--accent)}
+  h1{font-family:var(--mincho); font-weight:700; font-size:30px; line-height:1.3; margin:0; letter-spacing:.03em}
+  .lede{margin:0; color:var(--muted); font-size:15px; max-width:34em}
+  h2{font-family:var(--mincho); font-weight:600; font-size:18px; line-height:1.45; margin:0; letter-spacing:.04em}
+
+  .status{display:flex; align-items:center; gap:9px; margin:0; font-size:15px; color:var(--muted)}
+  .status .dot{flex:none; width:10px; height:10px; border-radius:50%; background:var(--rule)}
+  .status[data-state="wait"] .dot{animation:blink 1.1s ease-in-out infinite}
+  .status[data-state="ok"]{color:var(--accent); font-weight:500}
+  .status[data-state="ok"] .dot{background:var(--accent)}
+  .status[data-state="bad"]{color:var(--alert); font-weight:500}
+  .status[data-state="bad"] .dot{background:var(--alert)}
+  @keyframes blink{50%{opacity:.3}}
+
+  .gate{background:var(--alert-soft); border:1px solid var(--alert); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:6px}
+  .gate p{margin:0; font-size:15px}
+
+  .drop{position:relative; background:var(--card); border:2px dashed var(--rule); border-radius:14px; padding:22px 20px 24px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; transition:border-color .15s, background .15s}
+  .drop.on{border-color:var(--accent); background:var(--accent-soft)}
+  .drop .mark{width:46px; height:46px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-size:22px}
+  .drop p{margin:0; color:var(--muted); font-size:14px}
+  .memo-row{width:100%; max-width:340px; display:flex; flex-direction:column; gap:4px; text-align:left}
+  .memo-row label{font-size:13px; color:var(--muted)}
+  .memo{width:100%; font-family:var(--gothic); font-size:16px; color:var(--ink); background:var(--paper); border:1px solid var(--rule); border-radius:8px; padding:9px 10px}
+  .memo:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+  .pick{display:inline-flex; align-items:center; justify-content:center; min-height:60px; padding:0 26px; border-radius:12px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:18px; cursor:pointer; width:100%; max-width:340px; user-select:none; -webkit-tap-highlight-color:transparent}
+  .pick:active{transform:translateY(1px)}
+  #file{position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap}
+  #file:focus-visible + .pick{outline:3px solid var(--accent); outline-offset:3px}
+
+  .progress{display:flex; flex-direction:column; gap:6px}
+  .row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:14px; padding:8px 12px; background:var(--card); border:1px solid var(--rule); border-radius:8px}
+  .row .name{flex:none; font-family:var(--mono); font-size:12.5px; color:var(--muted)}
+  .row .state{text-align:right}
+  .row[data-kind="ok"] .state{color:var(--accent)}
+  .row[data-kind="bad"]{border-color:var(--alert)}
+  .row[data-kind="bad"] .state{color:var(--alert)}
+  .retry{align-self:flex-start; min-height:48px; padding:8px 18px; border-radius:10px; border:1.5px solid var(--alert); background:var(--card); color:var(--alert); font:700 15px/1.4 var(--gothic); cursor:pointer; text-align:left}
+
+  .bar{display:flex; flex-wrap:wrap; gap:0 26px; align-items:baseline; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); padding-block:10px; margin:0}
+  .stat{display:flex; align-items:baseline; gap:7px}
+  .stat dt{font-size:13px; color:var(--muted); letter-spacing:.06em}
+  .stat dd{margin:0; font-family:var(--mono); font-size:19px; font-variant-numeric:tabular-nums}
+
+  .tips{background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:14px 18px 16px; display:flex; flex-direction:column; gap:8px}
+  .tips ul{margin:0; padding-left:1.15em; display:flex; flex-direction:column; gap:5px; font-size:15px}
+  .tips li::marker{color:var(--accent)}
+
+  .notes{display:flex; flex-direction:column; gap:4px}
+  .note{margin:0; font-size:14px; color:var(--muted)}
+  .note b{color:var(--alert); font-weight:700}
+
+  .list{display:flex; flex-direction:column; gap:10px}
+  .grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; list-style:none; margin:0; padding:0}
+  @media (min-width:560px){ .grid{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  .shot{background:var(--card); border:1px solid var(--rule); border-radius:10px; overflow:hidden; box-shadow:var(--shadow)}
+  .shot img{display:block; width:100%; max-width:100%; aspect-ratio:1/1; object-fit:cover; background:var(--accent-soft)}
+  .tabs{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:5px}
+  .tab{min-height:50px; border:0; border-radius:9px; background:transparent; color:var(--muted); font:700 16px/1.3 var(--gothic); cursor:pointer; -webkit-tap-highlight-color:transparent}
+  .tab[aria-pressed="true"]{background:var(--accent); color:var(--on-accent)}
+  .tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .pane{display:flex; flex-direction:column; gap:20px}
+
+  .filter{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px}
+  @media (max-width:479px){ .filter{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .filter button{min-height:46px; padding:6px 8px; border-radius:10px; border:1px solid var(--rule); background:var(--card); color:var(--ink); font:500 14px/1.35 var(--gothic); cursor:pointer}
+  .filter button[aria-pressed="true"]{border-color:var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:700}
+  .filter button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .find-row{display:flex; flex-direction:column; gap:4px}
+  .find-row label{font-size:13px; color:var(--muted)}
+
+  .stock{display:flex; flex-direction:column; gap:22px}
+  .grp{display:flex; flex-direction:column; gap:8px}
+  .grp-h{display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding-bottom:6px; border-bottom:1px solid var(--rule); word-break:normal; overflow-wrap:break-word}
+  .grp-h > span:first-child{min-width:0}
+  .what .ph, .meta .ph, .grp-h .ph{max-width:100%; overflow-wrap:anywhere}
+  .grp-n{flex:none; font-family:var(--mono); font-size:14px; font-weight:500; color:var(--muted)}
+  .items{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+  .item{display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:4px 12px; align-items:start; background:var(--card); border:1px solid var(--rule); border-radius:10px; padding:10px 14px 11px}
+  .lab{font-family:var(--gothic); font-weight:700; font-size:14px; font-variant-numeric:slashed-zero; color:var(--muted); min-width:2em; padding-top:2px}   /* ラベルの O（オー）と 0（ゼロ）を見分ける（2026-09-15 本人が「0の進め方って何？」と読み違えた）＝細い等幅の字をやめて、丸い字の太字に */
+  .what{margin:0; font-size:15px; line-height:1.55; word-break:normal; overflow-wrap:break-word}
+  .meta{margin:4px 0 0; font-size:13px; line-height:1.5; color:var(--muted); display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; word-break:normal; overflow-wrap:break-word}
+  .chip{flex:none; display:inline-block; padding:0 9px; border-radius:999px; font-size:12px; font-weight:700; line-height:1.9; background:var(--accent-soft); color:var(--accent)}
+  .chip[data-state="未出品"]{background:var(--warn-soft); color:var(--warn)}
+  .chip[data-state="売れた"], .chip[data-state="その他"]{background:var(--paper); color:var(--muted); border:1px solid var(--rule); line-height:1.75}
+  .item[data-state="売れた"] .what{color:var(--muted)}
+  .cnt{font-family:var(--mono); font-size:21px; line-height:1.2; font-variant-numeric:tabular-nums; white-space:nowrap; padding-top:1px}
+  .cnt small{font-family:var(--gothic); font-size:12px; color:var(--muted); margin-left:2px}
+  .empty{margin:0; padding:18px 16px; text-align:center; color:var(--muted); background:var(--card); border:1px dashed var(--rule); border-radius:10px}
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important; animation:none!important} }
+  /* ---- 改良①（2026-09-13）：やること・送った写真の行方・受付の表示 ---- */
+  .tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .pc{display:flex; align-items:flex-start; gap:10px; margin:0; background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:12px 14px; font-size:15px; line-height:1.6}
+  .pc .dot{flex:none; width:12px; height:12px; margin-top:6px; border-radius:50%; background:var(--rule)}
+  .pc[data-state="on"] .dot{background:var(--accent)}
+  .pc[data-state="off"]{border-color:var(--alert)}
+  .pc[data-state="off"] .dot{background:var(--alert)}
+  .todo{display:flex; flex-direction:column; gap:10px}
+  .todo button{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; text-align:left; background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:14px 16px; font:500 17px/1.5 var(--gothic); color:var(--ink); cursor:pointer}
+  .todo button[data-hot="1"]{background:var(--warn-soft); border-color:var(--warn)}
+  .todo button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .todo .n{flex:none; font-family:var(--mono); font-size:28px; line-height:1.1; white-space:nowrap}
+  .todo .n small{font-family:var(--gothic); font-size:14px; color:var(--muted); margin-left:3px}
+  .todo .sub{display:block; font-size:13px; font-weight:400; color:var(--muted)}
+  #home-pick, #home-card{border:0; width:100%; max-width:none; font-family:var(--gothic)}
+  .qnote{margin:0; padding:10px 14px; border-radius:10px; font-size:15px; line-height:1.6; font-weight:500; background:var(--accent-soft); color:var(--accent)}
+  .qnote[data-kind="wait"]{background:var(--warn-soft); color:var(--warn)}
+  .shots{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+  .shot2{background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:10px 12px}
+  .shot2[data-kind="bad"]{border-color:var(--alert)}
+  .srow{display:flex; gap:10px; align-items:center}
+  .srow img, .srow .ph0{flex:none; display:block; width:48px; height:48px; border-radius:8px; object-fit:cover; background:var(--accent-soft)}
+  .when{font-family:var(--mono); font-size:13.5px; color:var(--muted)}
+  .track{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin-top:8px}
+  .track span{font-size:13px; text-align:center; padding:4px 0; border-radius:6px; background:var(--paper); color:var(--muted); white-space:nowrap}
+  .track span[data-s="ok"]{background:var(--accent-soft); color:var(--accent); font-weight:700}
+  .track span[data-s="now"]{background:var(--warn-soft); color:var(--warn); font-weight:700}
+  .track span[data-s="bad"]{background:var(--alert-soft); color:var(--alert); font-weight:700}
+  .res{margin:8px 0 0; font-size:14.5px; line-height:1.6}
+  .res .ph{max-width:100%; overflow-wrap:anywhere}
+  /* ---- 見やすくする直し（2026-09-13） ---- */
+  .shot2{display:grid; grid-template-columns:56px minmax(0,1fr); gap:12px; align-items:start; padding:12px 14px}
+  .shot2 img, .shot2 .ph0{display:block; width:56px; height:56px; border-radius:8px; object-fit:cover; background:var(--accent-soft)}
+  .smain{margin:0; display:flex; align-items:center; gap:8px; font-size:17px; font-weight:700; line-height:1.4; color:var(--muted)}
+  .sdot{flex:none; width:12px; height:12px; border-radius:50%; background:var(--muted)}
+  .shot2[data-kind="ok"] .smain{color:var(--accent)}
+  .shot2[data-kind="ok"] .sdot{background:var(--accent)}
+  .shot2[data-kind="now"] .smain{color:var(--warn)}
+  .shot2[data-kind="now"] .sdot{background:var(--warn)}
+  .shot2[data-kind="bad"] .smain{color:var(--alert)}
+  .shot2[data-kind="bad"] .sdot{background:var(--alert)}
+  .shot2[data-kind="off"] .smain{color:var(--muted)}      /* 在庫から外した品の写真（2026-09-23） */
+  .shot2[data-kind="off"] .sdot{background:var(--muted)}
+  .shot2[data-kind="off"] img{filter:grayscale(1); opacity:.6}
+  .ssub{margin:3px 0 0; font-size:15px; line-height:1.55}
+  .ssub .ph{max-width:100%; overflow-wrap:anywhere}
+  .swhen{margin:3px 0 0; font-family:var(--mono); font-size:13px; color:var(--muted)}
+  .more{width:100%; min-height:48px; border-radius:10px; border:1px solid var(--rule); background:var(--card); color:var(--accent); font:700 15px/1.4 var(--gothic); cursor:pointer}
+  .todo button[data-hot="1"]{background:var(--card); border-color:var(--rule); box-shadow:inset 6px 0 0 var(--warn)}
+  details.tips summary{cursor:pointer; font-family:var(--mincho); font-weight:600; font-size:18px}
+  /* ==== ポップな見た目（2026-09-13）：空と草原・太い黒ふち・ずらした影。字は白い札の上 ==== */
+  :root{
+    --paper:#fff8e7; --card:#ffffff; --ink:#1d1a2b; --muted:#4a4560; --rule:#1d1a2b;
+    --accent:#0f8a4a; --accent-soft:#d9f7c9; --on-accent:#ffffff;
+    --alert:#d11f3a; --alert-soft:#ffd6de; --warn:#a85300; --warn-soft:#ffe7b3;
+    --sun:#ffd83d; --sky:#3ec1ff; --pink:#ff5fa2; --tomato:#ff5a36; --grape:#9b5cff; --leaf:#5ccf45;
+    --pop:"Mochiy Pop One","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+    --gothic:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    --mincho:var(--pop);
+    --shadow:4px 4px 0 var(--ink);
+    color-scheme:light;
+  }
+  body{background:#4cc3ff; color:var(--ink); font-family:var(--gothic); font-weight:500}
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(circle at 92% 3%, var(--sun) 0 34px, var(--ink) 35px 38px, transparent 39px),
+      radial-gradient(circle at 9% 14%, var(--pink) 0 10px, var(--ink) 11px 13px, transparent 14px),
+      radial-gradient(circle at 94% 36%, var(--grape) 0 9px, var(--ink) 10px 12px, transparent 13px),
+      radial-gradient(circle at 5% 52%, var(--sun) 0 8px, var(--ink) 9px 11px, transparent 12px),
+      radial-gradient(circle at 96% 74%, var(--tomato) 0 9px, var(--ink) 10px 12px, transparent 13px),
+      radial-gradient(ellipse 34% 7% at 22% 30%, #ffffff 0 96%, transparent 100%),
+      radial-gradient(ellipse 26% 6% at 78% 22%, #ffffff 0 96%, transparent 100%),
+      radial-gradient(ellipse 150% 34% at 50% 104%, var(--leaf) 0 62%, var(--ink) 62.4% 63.2%, transparent 63.6%),
+      radial-gradient(rgba(255,255,255,.45) 2px, transparent 2.6px) 0 0 / 26px 26px,
+      linear-gradient(180deg, #34b8ff 0%, #8fe0ff 58%, #c8f3ff 100%);
+  }
+  @media (max-width:1000px){
+    body::before{
+      background:
+        radial-gradient(circle at 92% 3%, var(--sun) 0 34px, var(--ink) 35px 38px, transparent 39px),
+        radial-gradient(ellipse 34% 7% at 22% 30%, #ffffff 0 96%, transparent 100%),
+        radial-gradient(ellipse 26% 6% at 78% 22%, #ffffff 0 96%, transparent 100%),
+        radial-gradient(ellipse 150% 34% at 50% 104%, var(--leaf) 0 62%, var(--ink) 62.4% 63.2%, transparent 63.6%),
+        radial-gradient(rgba(255,255,255,.45) 2px, transparent 2.6px) 0 0 / 26px 26px,
+        linear-gradient(180deg, #34b8ff 0%, #8fe0ff 58%, #c8f3ff 100%);
+    }
+  }
+  .wrap{gap:18px}
+  .head{align-items:flex-start; gap:4px}
+  .eyebrow{display:inline-block; font-family:var(--pop); font-size:13px; letter-spacing:.06em; color:var(--ink); background:var(--sun); border:3px solid var(--ink); border-radius:999px; padding:1px 12px; transform:rotate(-3deg); box-shadow:3px 3px 0 var(--ink)}
+  h1.logo{font-family:var(--pop); font-weight:400; font-size:clamp(40px,11vw,56px); line-height:1.15; margin:8px 0 2px; letter-spacing:.01em}
+  h1.logo span{display:inline-block; -webkit-text-stroke:3px var(--ink); paint-order:stroke fill; text-shadow:3px 4px 0 var(--ink)}
+  h1.logo span:nth-child(1){color:var(--tomato); transform:rotate(-7deg)}
+  h1.logo span:nth-child(2){color:var(--sun); transform:rotate(5deg) translateY(-3px)}
+  h1.logo span:nth-child(3){color:var(--pink); transform:rotate(-4deg)}
+  h1.logo span:nth-child(4){color:var(--leaf); transform:rotate(6deg) translateY(-4px)}
+  h1.logo span:nth-child(5){color:#ffffff; transform:rotate(-5deg)}
+  h1.logo span:nth-child(6){color:var(--grape); transform:rotate(7deg) translateY(-2px)}
+  h2, summary{font-family:var(--pop); font-weight:400; letter-spacing:.02em}
+  .status, .pc{background:var(--card); color:var(--ink); border:3px solid var(--ink); border-radius:16px; box-shadow:var(--shadow); padding:10px 14px; font-weight:700}
+  .pc[data-state="off"]{background:var(--alert-soft); border-color:var(--ink)}
+  .pc .dot, .status .dot{border:2px solid var(--ink); width:14px; height:14px}
+  /* 赤枠待ち（2026-09-16 本人「1」）＝どのタブでも一番上に出す。席を外していても「パソコンで押す物がある」と気づけるように */
+  .redwait{margin:0; background:var(--alert-soft); color:var(--ink); border:3px solid var(--ink); border-radius:16px; box-shadow:var(--shadow), inset 10px 0 0 var(--alert); padding:12px 14px 12px 24px; display:flex; flex-direction:column; gap:6px}
+  .redwait .rw-head{margin:0; display:flex; align-items:flex-start; gap:10px; font-size:18px; font-weight:700; line-height:1.5}
+  .redwait .dot{flex:none; width:14px; height:14px; margin-top:6px; border-radius:50%; background:var(--alert); border:2px solid var(--ink)}
+  .redwait .rw-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; font-size:15px; font-weight:700; line-height:1.55}
+  .redwait .rw-note{margin:0; font-size:14px; line-height:1.6}
+  .redwait .rw-go{align-self:flex-start; min-height:44px; border:3px solid var(--ink); border-radius:12px; background:var(--card); color:var(--ink); font-weight:700; font-size:15px; padding:6px 16px; box-shadow:2px 2px 0 var(--ink)}
+  .tabs{background:transparent; border:0; padding:0; gap:8px}
+  .tab{background:var(--card); color:var(--ink); border:3px solid var(--ink); border-radius:14px; box-shadow:3px 3px 0 var(--ink); font-family:var(--pop); font-weight:400; font-size:15px}
+  .tab[aria-pressed="true"]{background:var(--pink); color:var(--ink); box-shadow:1px 1px 0 var(--ink); transform:translate(2px,2px)}
+  .gate{background:var(--card); border:3px solid var(--ink); box-shadow:var(--shadow)}
+  .drop{background:var(--card); border:3px solid var(--ink); border-radius:22px; box-shadow:6px 6px 0 var(--ink)}
+  .drop .mark{background:var(--sun); color:var(--ink); border:3px solid var(--ink); font-family:var(--pop)}
+  .drop p, .memo-row label{color:var(--muted); font-weight:700}
+  .memo{background:var(--paper); border:2px solid var(--ink); font-family:var(--gothic); font-weight:500}
+  .pick, #home-pick, #home-card{background:var(--sun); color:var(--ink); border:3px solid var(--ink); border-radius:16px; box-shadow:5px 5px 0 var(--ink); font-family:var(--pop); font-weight:400; font-size:21px; letter-spacing:.02em}
+  .pick:active, #home-pick:active, #home-card:active{transform:translate(3px,3px); box-shadow:2px 2px 0 var(--ink)}
+  .qnote{background:var(--accent-soft); color:var(--ink); border:3px solid var(--ink); box-shadow:var(--shadow); font-weight:700}
+  .qnote[data-kind="wait"]{background:var(--warn-soft); color:var(--ink)}
+  .retry{background:var(--card); border:3px solid var(--ink); color:var(--alert); box-shadow:3px 3px 0 var(--ink)}
+  .list > h2{align-self:flex-start; background:var(--pink); color:var(--ink); border:3px solid var(--ink); border-radius:999px; padding:1px 14px 2px; box-shadow:3px 3px 0 var(--ink); font-size:17px; transform:rotate(-2deg)}
+  .shot2{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow)}
+  .shot2[data-kind="bad"]{background:var(--alert-soft); border-color:var(--ink)}
+  .shot2 img, .shot2 .ph0{border:2px solid var(--ink)}
+  .sdot{border:2px solid var(--ink); width:14px; height:14px}
+  .swhen{color:var(--muted)}
+  .more{border:3px solid var(--ink); box-shadow:3px 3px 0 var(--ink); color:var(--ink); font-family:var(--pop); font-weight:400}
+  .tips, .notes{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:12px 16px}
+  .tips li::marker{color:var(--tomato)}
+  .note{color:var(--ink)}
+  .todo button{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); font-family:var(--gothic); font-weight:700}
+  .todo button[data-hot="1"]{background:var(--card); border-color:var(--ink); box-shadow:inset 10px 0 0 var(--tomato), var(--shadow); padding-left:20px}
+  .todo .n{font-family:var(--pop)}
+  .todo .sub{color:var(--muted)}
+  .bar{background:var(--card); border:3px solid var(--ink); border-radius:16px; box-shadow:var(--shadow); padding-inline:14px}
+  .stat dt{color:var(--muted); font-weight:700}
+  .filter button{border:3px solid var(--ink); box-shadow:3px 3px 0 var(--ink); border-radius:12px; font-weight:700; background:var(--card); color:var(--ink)}
+  .filter button[aria-pressed="true"]{background:var(--pink); color:var(--ink); box-shadow:1px 1px 0 var(--ink); transform:translate(2px,2px)}
+  .find-row{background:var(--card); border:3px solid var(--ink); border-radius:16px; box-shadow:var(--shadow); padding:10px 14px}
+  #pane-stock > .note{background:var(--card); border:2px solid var(--ink); border-radius:12px; padding:8px 12px; color:var(--ink)}
+  .grp{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:12px}
+  .grp-h{border-bottom:2px dashed var(--ink)}
+  .grp-h > span:first-child{font-family:var(--pop); font-weight:400}
+  /* 作品ごとに開け閉め（2026-09-16 本人「カテゴリごとにプルダウンできる形式に…scrollが長いので」）＝閉じている時は作品名と数だけ。押す所は見出し全体 */
+  details.grp > summary.grp-h{list-style:none; cursor:pointer; display:flex; flex-direction:column; align-items:stretch; gap:6px; min-height:48px}
+  details.grp > summary.grp-h::-webkit-details-marker{display:none}
+  details.grp:not([open]) > summary.grp-h{border-bottom:0; padding-bottom:0}
+  details.grp > summary.grp-h:focus-visible{outline:3px solid var(--ink); outline-offset:3px; border-radius:10px}
+  .grp-name{display:block; min-width:0; font-family:var(--pop); font-weight:400; font-size:17px; line-height:1.5}
+  .grp-row{display:flex; justify-content:space-between; align-items:center; gap:10px}   /* 2行目＝数と「ひらく」。1行目の作品名に横幅を全部使わせる（スマホ幅で「シールウエ／ハース」と折れたため） */
+  .grp-row .grp-n{font-family:var(--gothic); font-size:14px; font-weight:700; color:var(--muted)}
+  .grp-tg{flex:none; border:2px solid var(--ink); border-radius:999px; padding:3px 12px; font-size:14px; font-weight:700; background:var(--sun); color:var(--ink); white-space:nowrap}
+  details[open] > summary .grp-tg{background:var(--card)}
+  .grp-sub{display:flex; flex-wrap:wrap; gap:4px 12px; font-size:14px; font-weight:700; color:var(--muted)}
+  .grp-sub .hot{color:var(--alert)}
+  .grp-all-row{display:flex; justify-content:flex-end}
+  .grp-all{min-height:44px; border:3px solid var(--ink); border-radius:12px; background:var(--card); color:var(--ink); font-weight:700; font-size:15px; padding:6px 16px; box-shadow:2px 2px 0 var(--ink)}
+  .item{border:2px solid var(--ink); border-radius:14px}
+  .chip{border:2px solid var(--ink)}
+  .chip[data-state="未出品"]{background:var(--sun); color:var(--ink)}
+  .empty{background:var(--card); border:3px dashed var(--ink)}
+  /* ---- 改良②（2026-09-13）：値段の画面（10円刻み）・スマホのお願い ---- */
+  .go{grid-column:1 / -1; justify-self:stretch; margin-top:6px; min-height:46px; border:3px solid var(--ink); border-radius:12px; background:var(--sun); color:var(--ink); font-family:var(--pop); font-weight:400; font-size:16px; line-height:1.3; padding:6px 10px; box-shadow:3px 3px 0 var(--ink); cursor:pointer}
+  .go:active{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+  .item[data-state="出品中"] .go{background:var(--card)}
+  .go.done{background:var(--card); color:var(--muted); border-style:dashed; box-shadow:none; font-family:var(--gothic); font-weight:700}   /* お願い済み＝押しても様子を見るだけ */
+  .money{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:10px 14px 12px; display:flex; flex-direction:column; gap:2px}   /* 純利の累計（2026-09-15） */
+  .money p{margin:0}
+  .money-h{font-weight:700; font-size:15px; line-height:1.55}
+  .money-big{font-family:var(--pop); font-size:32px; line-height:1.3; font-variant-numeric:tabular-nums}
+  .money-big small{font-family:var(--gothic); font-size:15px; font-weight:700; margin-left:.25em}
+  .money-sub{font-size:14px; line-height:1.65; font-weight:700; color:var(--muted)}
+  .chip[data-state="取引完了"]{background:var(--accent); color:var(--on-accent)}
+  .sale{font-weight:700; color:var(--ink)}
+  .item .go.stop{background:var(--alert-soft)}   /* 売れたら ほかの出品を止める（2026-09-15） */
+  .item .go.ask{background:var(--alert-soft)}    /* この出品をやめる（2026-09-23） */
+  .item .go.paid{background:var(--accent); color:var(--on-accent)}   /* お金が入った＝売却済みにする（2026-09-23） */
+  .ak-warn{margin-top:4px; color:var(--alert); font-weight:700}
+  .st-lead{background:var(--card); border:3px solid var(--ink); border-radius:14px; padding:10px 12px; font-size:15px; line-height:1.65}
+  .st-lead p{margin:0}
+  .st-lead .st-warn{margin-top:4px; color:var(--alert); font-weight:700}
+  .st-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px}
+  .st-sub{margin:4px 0 -4px; font-size:14px; font-weight:700; color:var(--muted)}
+  .st-ch{background:var(--card); border:3px solid var(--ink); border-radius:16px; box-shadow:var(--shadow); padding:10px 12px 12px; display:flex; flex-direction:column; gap:8px; min-width:0}
+  .st-name{margin:0; font-weight:700; font-size:16px}
+  .st-open{display:flex; flex-wrap:wrap; align-items:center; justify-content:center; column-gap:.2em; min-height:54px; border:3px solid var(--ink); border-radius:14px; background:var(--sun); color:var(--ink); font-family:var(--pop); font-weight:400; font-size:17px; line-height:1.35; text-decoration:none; box-shadow:3px 3px 0 var(--ink); text-align:center; padding:6px 10px}
+  .st-open:active{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+  .st-how{margin:0; font-size:15px; line-height:1.7}
+  .st-how .no{color:var(--alert); font-weight:700}
+  .st-how .st-nm .ph{max-width:100%; overflow-wrap:anywhere}
+  .st-how .rec{display:block; color:var(--alert); font-weight:700}   /* 出品IDの記録が無い販路（2026-09-15 読み合わせ）＝一覧を開いて品名で探す */
+  .st-item{align-self:flex-start; display:inline-flex; flex-wrap:wrap; align-items:center; column-gap:.2em; min-height:44px; color:var(--ink); font-size:15px; font-weight:700; text-decoration:underline; text-underline-offset:3px}   /* ラクマ：どの品物か迷った時に、品物のページを開く */
+  .sh-acts.st-acts{grid-template-columns:minmax(0,1fr); bottom:-22px; padding-bottom:28px}   /* 画面の下の余白（22px）の分まで帯を届かせる＝閉じるの下から次の見出しがのぞかない */
+  /* ---- 写真の撮り直し（2026-09-15）＝パソコンが「撮り直してほしい」写真を、今の写真の縮小版つきで並べる。撮り直した写真は在庫を増やさずに差し替え ---- */
+  .retake{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:12px 14px; display:flex; flex-direction:column; gap:10px}
+  .retake h2{margin:0; font-size:17px}
+  .rt-lead{margin:0; font-size:14px; line-height:1.65; color:var(--muted); font-weight:700}
+  .rt-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px}
+  .rt-card{display:grid; grid-template-columns:88px minmax(0,1fr); grid-template-areas:"thumb body" "why why" "go go"; column-gap:10px; row-gap:6px; align-items:start; border:2px solid var(--ink); border-radius:14px; padding:10px 10px 12px; background:var(--paper)}   /* スマホ＝理由は縮小版の下に横いっぱい（縮小版の横の欄は1行9字しか入らない） */
+  @media (min-width:520px){ .rt-card{grid-template-areas:"thumb body" "thumb why" "go go"; grid-template-rows:auto 1fr auto} }   /* 広い画面＝理由も縮小版の横 */
+  .rt-thumb{grid-area:thumb; width:88px; height:88px; object-fit:cover; border-radius:10px; border:2px solid var(--ink); background:#fff; display:block; box-sizing:border-box}
+  .rt-nothumb{display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:var(--muted)}
+  .rt-body{grid-area:body; min-width:0; display:flex; flex-direction:column; gap:2px}
+  .rt-body p{margin:0}
+  .rt-name{font-weight:700; font-size:16px; line-height:1.5}
+  .rt-reason{grid-area:why; min-width:0; margin:0; font-size:15px; line-height:1.6}
+  .rt-tags{font-size:14px; line-height:1.6; color:var(--muted); font-weight:700}
+  .rt-sent{font-size:14px; line-height:1.6; color:var(--accent); font-weight:700}
+  .rt-name .ph{max-width:100%; overflow-wrap:anywhere}
+  .rt-reason, .rt-why{line-break:strict; word-break:auto-phrase; overflow-wrap:anywhere; text-wrap:pretty}   /* 理由は文＝文節で折り返す・句読点を行の頭に置かない（名前用の区切り方だと「。」だけの行ができた） */
+  .kana{white-space:nowrap}   /* ひらがなの続き（2〜8字）は途中で折らない＝文節の見分けが「に／じんでいる」「読みに／くい」と折った（2026-09-15） */
+  .rt-card .go{grid-area:go; margin-top:2px}
+  .item .go.rt-go, .rt-card .go.rt-go{background:var(--pink); color:var(--ink)}   /* 出品中の品物（白いボタンの決まり）でも同じ色 */
+  .rt-badge{display:inline-block; padding:0 8px; border-radius:999px; border:2px solid var(--ink); background:var(--pink); color:var(--ink); font-size:12px; font-weight:700; line-height:1.8}
+  .rt-now{margin:0; display:flex; flex-direction:column; align-items:center; gap:4px}
+  .rt-now img{display:block; width:100%; max-width:200px; height:auto; aspect-ratio:1 / 1; object-fit:contain; border:3px solid var(--ink); border-radius:14px; background:#fff; box-sizing:border-box}
+  .rt-now figcaption{font-size:13px; color:var(--muted); font-weight:700}
+  .rt-why{margin:0; font-size:15px; line-height:1.65; background:var(--card); border:2px solid var(--ink); border-radius:12px; padding:8px 12px}
+  .rt-tips{background:var(--card); border:2px dashed var(--ink); border-radius:12px; padding:8px 12px}
+  .rt-tips p{margin:0 0 2px; font-weight:700; font-size:14px}
+  .rt-tips ul{margin:0; padding-left:1.2em; font-size:15px; line-height:1.7}
+  .rt-picks{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px}
+  .rt-picks .pick{margin:0; max-width:none; min-height:60px; padding:6px 8px; font-size:17px; line-height:1.3; text-align:center; box-sizing:border-box}
+  .rt-msg{margin:0; font-size:15px; line-height:1.65; font-weight:700; color:var(--accent)}
+  #rt-cam, #rt-album{position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap}
+  /* ---- カードを1〜5枚で送る（2026-09-21 表と裏の2枚 → 2026-09-22 本人「5枚までにしましょうか　例えば　表　裏　スリーブ入り　特殊スリーブ入り　注意点の傷部分のアップ」）＝1枚目（一覧の顔）から順に撮って、まとめて1枚のカードとして送る・何枚にするかは自由 ---- */
+  .pick-card, #home-card{background:var(--pink)}
+  .pick-card{flex-direction:column; line-height:1.3; padding-block:8px}
+  .pick-card .ph{white-space:nowrap}
+  .pick-card .cd-sub{font-family:var(--gothic); font-weight:700; font-size:16px; letter-spacing:0}
+  .drop .pick-card{margin-top:6px}
+  .cd-lead{margin:0; font-size:15px; line-height:1.6; font-weight:700}
+  .cd-shots{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px}
+  @media (min-width:520px){ .cd-shots{grid-template-columns:repeat(5,minmax(0,1fr))} }
+  .cd-shot{display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0}
+  .cd-th{position:relative; width:100%; aspect-ratio:63 / 88; border:3px solid var(--ink); border-radius:10px; background:#fff; display:grid; place-items:center; overflow:hidden; box-sizing:border-box}
+  .cd-th img{display:block; width:100%; height:100%; object-fit:cover}
+  .cd-empty .cd-th{border-style:dashed; background:var(--sun)}
+  .cd-th .cd-ph{font-family:var(--pop); font-size:34px; line-height:1; color:var(--ink)}
+  .cd-x{position:absolute; top:4px; right:4px; width:44px; height:44px; padding:0; border-radius:50%; border:3px solid var(--ink); background:var(--card); color:var(--alert); font:700 24px/1 var(--gothic); display:grid; place-items:center; box-shadow:2px 2px 0 var(--ink); cursor:pointer}   /* 指で押せる大きさ（44px）＝外す */
+  .cd-x:active{transform:translate(2px,2px); box-shadow:none}
+  .cd-lab{margin:0; font-size:15px; font-weight:700; text-align:center; line-height:1.4}
+  .cd-guide{margin:0; font-size:15px; line-height:1.65; font-weight:700; background:var(--card); border:2px solid var(--ink); border-radius:12px; padding:8px 12px}
+  .cd-memo-row{max-width:none}
+  .cd-memo-row label{font-size:15px; color:var(--ink)}
+  .memo:disabled{opacity:.5}
+  #cd-cam, #cd-album{position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap}
+  #cd-picks .pick{flex-wrap:wrap; align-content:center}   /* 「もう1枚」「カメラで撮る」を2行に折る（はみ出さない） */
+  .sh-close.cd-send{background:var(--pink); font-family:var(--pop); font-weight:400; font-size:19px}   /* .sh-close（白）より後ろで勝つように2つ重ねる */
+  .sh-close.cd-send:disabled{opacity:.45; box-shadow:none}
+  .sh-close.cd-next{background:var(--sun); font-family:var(--pop); font-weight:400; font-size:19px}
+  .ref{font-weight:700; color:var(--ink)}
+  .sh-ref hr.ref-sep{border:0; border-top:2px dashed var(--muted); margin:8px 0 6px}   /* その品物の数字と、同じキャラの1枚売りの数字を分ける（2026-09-15） */
+  .ostate{display:inline-block; padding:0 8px; border-radius:999px; border:2px solid var(--ink); background:#bfe9ff; color:var(--ink); font-size:12px; font-weight:700; line-height:1.8}
+  .ostate[data-s="赤枠待ち"]{background:var(--pink)}
+  .ostate[data-s="出品済み"], .ostate[data-s="変更済み"]{background:var(--accent-soft)}
+  .ostate[data-s="できなかった"]{background:var(--alert-soft)}
+  body.sheet-open{overflow:hidden}
+  .sheet-back{position:fixed; inset:0; z-index:50; background:rgba(29,26,43,.55); display:flex; align-items:flex-end; justify-content:center; padding:12px 10px 0}
+  .sheet{box-sizing:border-box; width:100%; max-width:560px; max-height:calc(100dvh - 16px); overflow-y:auto; overscroll-behavior:contain; background:var(--paper); border:3px solid var(--ink); border-bottom:0; border-radius:22px 22px 0 0; padding:16px 14px 22px; display:flex; flex-direction:column; gap:12px}
+  @media (min-width:700px){ .sheet-back{align-items:center; padding:24px} .sheet{border-bottom:3px solid var(--ink); border-radius:22px; box-shadow:6px 6px 0 var(--ink)} }
+  .sh-head{display:flex; flex-direction:column; gap:2px}
+  .sh-grp{margin:0; font-size:13px; color:var(--muted); font-weight:700}
+  .sh-what{margin:0; font-size:19px; line-height:1.45; outline:none}
+  .sh-now{margin:2px 0 0; font-size:14px; font-weight:700}
+  .sh-ref{background:var(--card); border:2px solid var(--ink); border-radius:14px; padding:10px 12px; font-size:14px; line-height:1.6}
+  .sh-ref p{margin:0}
+  .sh-ref b{font-family:var(--pop); font-weight:400; font-size:20px}
+  .sh-ref .small{font-size:12.5px; color:var(--muted)}
+  .px-box{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:12px 14px 14px; display:flex; flex-direction:column; gap:10px}
+  .px-label{margin:0; font-weight:700; font-size:14px}
+  .px{margin:0; display:flex; align-items:baseline; justify-content:center; gap:4px; font-family:var(--pop)}
+  .px .yen{font-size:28px}
+  .px input{width:5.6em; max-width:75%; border:0; border-bottom:3px solid var(--ink); border-radius:0; background:transparent; font-family:var(--pop); font-size:44px; line-height:1.2; text-align:center; color:var(--ink); font-variant-numeric:tabular-nums; padding:0}
+  .px-gauge{position:relative; height:26px; margin:0 10px}
+  .px-gauge .g-bar{position:absolute; left:0; right:0; top:9px; height:10px; border:2px solid var(--ink); border-radius:999px; background:linear-gradient(90deg,#8fe0ff,#5ccf45,#ffd83d,#ff5a36)}
+  .px-gauge .g-med{position:absolute; top:3px; width:4px; height:22px; margin-left:-2px; background:var(--ink); border-radius:2px}
+  .px-gauge .g-me{position:absolute; top:1px; width:20px; height:20px; margin-left:-10px; background:var(--pink); border:3px solid var(--ink); border-radius:50%; box-sizing:border-box; transition:left .12s}
+  .px-gl{margin:0; display:flex; justify-content:space-between; gap:8px; font-size:12px; color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums}
+  .steps{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px}
+  .steps button{min-height:54px; border:3px solid var(--ink); border-radius:12px; background:#ffe0ee; font-family:var(--pop); font-weight:400; font-size:18px; color:var(--ink); box-shadow:3px 3px 0 var(--ink); touch-action:manipulation; user-select:none; -webkit-user-select:none; padding:0}
+  .steps button[data-d^="-"]{background:#d8f1ff}
+  .steps button:active{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+  .px-ref{align-self:center; border:2px solid var(--ink); border-radius:999px; background:var(--card); color:var(--ink); padding:5px 16px; font-weight:700; font-size:14px}
+  .chans{margin:0; border:3px solid var(--ink); border-radius:18px; background:var(--card); padding:8px 12px 10px; min-width:0}
+  .chans legend{padding:0 6px; font-weight:700; font-size:14px}
+  .chans ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px}
+  .chans li label{display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; min-height:46px; font-size:15px; font-weight:700}
+  .chans input{width:24px; height:24px; margin:0; accent-color:var(--pink)}
+  .chans .take{font-variant-numeric:tabular-nums; white-space:nowrap; font-size:14px}
+  .chans .take[data-low="1"]{color:var(--alert)}
+  .sh-memo-l{font-size:14px; font-weight:700; margin-bottom:-6px}
+  .sh-msg{margin:0; border:2px solid var(--ink); border-radius:12px; padding:8px 12px; background:var(--accent-soft); color:var(--ink); font-weight:700; line-height:1.6}
+  .sh-msg[data-kind="bad"]{background:var(--alert-soft)}
+  .sh-acts{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:10px; position:sticky; bottom:0; z-index:2; background:var(--paper); margin:0 -14px; padding:10px 14px 6px; border-top:2px dashed var(--ink)}   /* 画面が短くても、お願いのボタンはいつも見える */
+  .sh-close{min-height:54px; border:3px solid var(--ink); border-radius:14px; background:var(--card); color:var(--ink); font-weight:700; font-size:16px; box-shadow:3px 3px 0 var(--ink)}
+  .sh-acts .sh-go{min-height:54px; font-size:17px; line-height:1.3; margin:0; width:auto}
+  .sh-go:disabled{opacity:.45; box-shadow:none}
+  /* 送る前の確認（2026-09-16 点検その3）＝値段と出品先を大きく出して、もう一度押してもらう。下の帯と同じ場所に出す＝指の届く所・隠れない */
+  .sh-confirm{background:var(--accent-soft); border-top:3px solid var(--ink)}
+  .cf-text{grid-column:1 / -1; margin:0; font-size:16px; font-weight:700; line-height:1.6}
+  .cf-text .cf-big{font-family:var(--pop); font-weight:400; font-size:26px; line-height:1.3}
+  .cf-text .cf-chans{display:block; font-size:15px}
+  .sh-cancel{align-self:center; border:0; background:none; color:var(--alert); text-decoration:underline; font-weight:700; font-size:16px; padding:10px 14px; min-height:44px}
+  .sh-foot{margin:0; font-size:12.5px; color:var(--muted); line-height:1.6}
+  .orders{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:12px 14px; display:flex; flex-direction:column; gap:8px}
+  .orders h2{margin:0; font-size:17px}
+  .orders ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+  .orders li{border:2px solid var(--ink); border-radius:12px; padding:8px 10px; display:flex; flex-direction:column; gap:4px; font-size:14px; line-height:1.55}
+  .orders p{margin:0}
+  .orders .o-top{display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; font-weight:700}
+  .orders .o-note{color:var(--muted); font-size:13px}
+  .orders .o-cancel{align-self:flex-start; border:2px solid var(--ink); border-radius:10px; background:var(--card); color:var(--alert); font-weight:700; font-size:15px; padding:8px 18px; min-height:40px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <div class="eyebrow">カードマニア</div>
+    <h1 class="logo" aria-label="在庫スナップ"><span aria-hidden="true">在</span><span aria-hidden="true">庫</span><span aria-hidden="true">ス</span><span aria-hidden="true">ナ</span><span aria-hidden="true">ッ</span><span aria-hidden="true">プ</span></h1>
+    </header>
+
+  <p class="status" id="status" data-state="wait" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="status-text">つないで<wbr>います…</span></p>
+  <p class="pc" id="pc" data-state="wait" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="pc-text">パソコンのClaudeの<wbr>様子を<wbr>見ています…</span></p>
+
+  <section class="redwait" id="redwait" role="status" aria-live="polite" hidden>
+    <p class="rw-head"><span class="dot" aria-hidden="true"></span><span id="rw-title"></span></p>
+    <ul class="rw-list" id="rw-list"></ul>
+    <p class="rw-note" id="rw-note"></p>
+    <button type="button" class="rw-go" id="rw-go">お願いの一覧を見る</button>
+  </section>
+
+  <nav class="tabs" id="tabs" aria-label="画面の切り替え" hidden>
+    <button class="tab" id="tab-send" type="button" aria-pressed="true" aria-controls="pane-send">写真を送る</button>
+    <button class="tab" id="tab-home" type="button" aria-pressed="false" aria-controls="pane-home">やること</button>
+    <button class="tab" id="tab-stock" type="button" aria-pressed="false" aria-controls="pane-stock">在庫を見る</button>
+  </nav>
+
+  <section class="gate" id="gate" hidden>
+    <h2>リンクから<wbr>開いてください</h2>
+    <p>このページは、<wbr>送られてきた<wbr>リンク（QRコード）から<wbr>開くと<wbr>使えます。</p>
+  </section>
+
+  <div class="pane" id="pane-home" hidden>
+    <div class="todo">
+      <button type="button" id="todo-wait" data-hot="0"><span>見分け待ちの写真<span class="sub">届いたけれど、<wbr>まだ在庫に<wbr>入っていない写真</span></span><span class="n" id="n-todo-wait">–<small>枚</small></span></button>
+      <button type="button" id="todo-retake" data-hot="0"><span>写真の撮り直し<span class="sub">パソコンが<wbr>撮り直してほしい<wbr>写真</span></span><span class="n" id="n-todo-retake">–<small>件</small></span></button>
+      <button type="button" id="todo-price" data-hot="0"><span>値段を決める<span class="sub">まだ出していない在庫</span></span><span class="n" id="n-todo-price">–<small>枚</small></span></button>
+      <button type="button" id="todo-trade" data-hot="0"><span>取引中<span class="sub">売れて、<wbr>やりとりが<wbr>続いている物</span></span><span class="n" id="n-todo-trade">–<small>件</small></span></button>
+      <button type="button" id="todo-orders" data-hot="0"><span>お願いしたこと<span class="sub">出品・値段の変更の<wbr>進み具合</span></span><span class="n" id="n-todo-orders">–<small>件</small></span></button>
+    </div>
+    <section class="retake" id="retake-box" hidden>
+      <h2>写真の撮り直しのお願い</h2>
+      <p class="rt-lead"><span class="ph">撮り直して送ると、</span><span class="ph">在庫の数は増やさずに、</span><span class="ph">その品物の写真と</span><span class="ph">差し替えます。</span></p>
+      <ul class="rt-list" id="retake-list"></ul>
+    </section>
+    <section class="orders" id="orders-box" hidden>
+      <h2>お願いしたこと</h2>
+      <ul id="orders-list"></ul>
+    </section>
+    <button class="pick" id="home-pick" type="button">写真を撮って送る</button>
+    <button class="pick pick-card" id="home-card" type="button"><span class="cd-main"><span class="ph">カードを</span><span class="ph">撮って送る</span></span><span class="cd-sub">写真1〜5枚</span></button>
+  </div>
+
+  <div class="pane" id="pane-send">
+
+  <section class="drop" id="drop">
+    <div class="mark" aria-hidden="true">＋</div>
+    <div class="memo-row">
+      <label for="memo">メモ（書かなくてOK）</label>
+      <input class="memo" id="memo" type="text" maxlength="200" placeholder="例：LOG15のシール" autocomplete="off">
+    </div>
+    <input type="file" id="file" accept="image/*" multiple>
+    <label class="pick" for="file">写真を撮る・選ぶ</label>
+    <p>その場で<wbr>撮っても、<wbr>アルバムから<wbr>選んでも。<br>何枚<wbr>まとめてでも<wbr>大丈夫です。</p>
+    <button class="pick pick-card" id="card-pick" type="button"><span class="cd-main"><span class="ph">カードを</span><span class="ph">撮って送る</span></span><span class="cd-sub">写真1〜5枚</span></button>
+    <p>ポケカ・<wbr>ワンピなどの<wbr>カードは<wbr>こちら。<br>1枚の<wbr>カードを、<wbr>写真1〜5枚で<wbr>送れます<wbr><span class="ph">（表・裏・</span><wbr><span class="ph">傷のアップなど）。</span></p>
+  </section>
+
+  <p class="qnote" id="qnote" role="status" aria-live="polite" hidden></p>
+  <button class="retry" id="retry" type="button" hidden>まだ届いていない<wbr>写真を、<wbr>いますぐ<wbr>送り直す</button>
+
+  <section class="list" id="list" hidden>
+    <h2>送った写真</h2>
+    <ul class="shots" id="shots"></ul>
+  </section>
+
+  <dl class="bar" id="bar" hidden>
+    <div class="stat"><dt>まだ台帳にしていない</dt><dd id="n-wait">–</dd></div>
+    <div class="stat"><dt>台帳ずみ</dt><dd id="n-done">–</dd></div>
+    <div class="stat"><dt>いま送った</dt><dd id="n-sent">0</dd></div>
+  </dl>
+
+  <details class="tips">
+    <summary>撮り方の<wbr>コツ</summary>
+    <ul>
+      <li>明るい<wbr>所で、<wbr>真上から<wbr>撮る</li>
+      <li>1枚の<wbr>写真に<wbr>並べるのは<wbr>6枚くらいまで<wbr>（重ねない）</li>
+      <li>同じ物が<wbr>何枚もあるときは、<wbr>全部並べて写す<wbr>（枚数を<wbr>数えるため）</li>
+      <li>ポケカ・<wbr>ワンピの<wbr>カードは<wbr>「カードを<wbr>撮って送る」から<wbr>（写真1〜5枚で<wbr>1枚と<wbr>数えます）</li>
+    </ul>
+  </details>
+
+  <div class="notes">
+    <p class="note"><b>身分証・住所・カード番号が<wbr>写り込んだ<wbr>写真は<wbr>送らないでください。</b><wbr>写真の<wbr>位置情報は、<wbr>送る前に<wbr>消しています。</p>
+    <p class="note">このリンクは<wbr>家族以外に<wbr>送らないでください<wbr>（持っている人は<wbr>写真を<wbr>送れてしまうため）。</p>
+    <p class="note" id="home-tip" hidden></p>
+  </div>
+
+
+  </div>
+
+  <div class="pane" id="pane-stock" hidden>
+    <dl class="bar">
+      <div class="stat"><dt>手元にある</dt><dd id="s-have">–</dd></div>
+      <div class="stat"><dt>うち出品中</dt><dd id="s-listed">–</dd></div>
+      <div class="stat"><dt>まだ出していない</dt><dd id="s-new">–</dd></div>
+    </dl>
+
+    <div class="filter" id="filter" role="group" aria-label="しぼりこみ">
+      <button type="button" data-f="all" aria-pressed="true">すべて</button>
+      <button type="button" data-f="未出品" aria-pressed="false">まだ出していない</button>
+      <button type="button" data-f="出品中" aria-pressed="false">出品中</button>
+      <button type="button" data-f="売れた" aria-pressed="false">売れた</button>
+    </div>
+
+    <div class="find-row">
+      <label for="find">キャラや作品の名前で探す</label>
+      <input class="memo" id="find" type="search" maxlength="40" placeholder="例：ゾロ、ポチタ" autocomplete="off">
+    </div>
+
+    <p class="note" id="stock-note">在庫の<wbr>一覧を<wbr>読んでいます…</p>
+    <section class="money" id="money" hidden>
+      <p class="money-h"><span class="ph">手取りの累計</span><span class="ph">（取引が完了して</span><span class="ph">入金まで済んだ分）</span></p>
+      <p class="money-big" id="m-done">¥0</p>
+      <p class="money-sub" id="m-sub"></p>
+    </section>
+
+    <div class="grp-all-row"><button type="button" class="grp-all" id="grp-all" hidden>全部ひらく</button></div>
+    <div class="stock" id="stock"></div>
+
+    <p class="note">写真を<wbr>送ってから<wbr>ここに<wbr>出るまでは、<wbr>少し<wbr>時間が<wbr>かかります<wbr>（Claudeが<wbr>台帳に<wbr>書いてから<wbr>反映）。</p>
+  </div>
+
+</div>
+
+<div class="sheet-back" id="sheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-what">
+    <header class="sh-head">
+      <p class="sh-grp" id="sh-grp"></p>
+      <h2 class="sh-what" id="sh-what" tabindex="-1"></h2>
+      <p class="sh-now" id="sh-now"></p>
+    </header>
+    <div class="sh-ref" id="sh-ref"></div>
+    <div class="px-box">
+      <p class="px-label" id="sh-kind">出品する値段</p>
+      <p class="px"><span class="yen">¥</span><input id="sh-price" type="text" inputmode="numeric" autocomplete="off" aria-label="値段（円）" value="300"></p>
+      <div class="px-gauge" id="sh-gauge" aria-hidden="true"><span class="g-bar"></span><span class="g-med"></span><span class="g-me"></span></div>
+      <p class="px-gl" id="sh-gl"></p>
+      <div class="steps" role="group" aria-label="値段を10円・100円ずつ動かす">
+        <button type="button" data-d="-100">−100</button>
+        <button type="button" data-d="-10">−10</button>
+        <button type="button" data-d="10">＋10</button>
+        <button type="button" data-d="100">＋100</button>
+      </div>
+      <button type="button" class="px-ref" id="sh-useref" hidden>参考の値段にする</button>
+    </div>
+    <fieldset class="chans">
+      <legend>出品先と、<wbr>手取りの目安</legend>
+      <ul id="sh-chans"></ul>
+    </fieldset>
+    <label class="sh-memo-l" for="sh-memo">ひとこと（なくてよい）</label>
+    <input class="memo" id="sh-memo" type="text" maxlength="100" placeholder="例：2枚まとめて出す" autocomplete="off">
+    <p class="sh-msg" id="sh-msg" role="status" aria-live="polite" hidden></p>
+    <div class="sh-acts" id="sh-acts">
+      <button type="button" class="sh-close" id="sh-close">閉じる</button>
+      <button type="button" class="pick sh-go" id="sh-go">出品をお願いする</button>
+    </div>
+    <div class="sh-acts sh-confirm" id="sh-confirm" hidden>
+      <p class="cf-text" id="cf-text" role="status" aria-live="polite"></p>
+      <button type="button" class="sh-close" id="cf-back">戻る</button>
+      <button type="button" class="pick sh-go" id="cf-go">この内容で<wbr>お願いする</button>
+    </div>
+    <button type="button" class="sh-cancel" id="sh-cancel" hidden>このお願いを取り消す</button>
+    <p class="sh-foot" id="sh-foot">お願いは、<wbr>パソコンのClaudeが<wbr>動いた時に<wbr>流します。<wbr>最後の<wbr>「出品する」は、<wbr>いまは<wbr>パソコンの<wbr>赤枠で<wbr>押します。</p>
+  </section>
+</div>
+
+<div class="sheet-back" id="stopsheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="st-what">
+    <header class="sh-head">
+      <p class="sh-grp" id="st-grp"></p>
+      <h2 class="sh-what" id="st-what" tabindex="-1"></h2>
+      <p class="sh-now" id="st-now"></p>
+    </header>
+    <div class="st-lead">
+      <p><span class="ph">売れたサイトは、</span><span class="ph">そのまま。</span><span class="ph">ほかのサイトの出品を、</span><span class="ph">下のボタンから</span><span class="ph">止めてください。</span></p>
+      <p class="st-warn"><span class="ph">どのサイトも</span><span class="ph">「削除」は押さない。</span><span class="ph">止めるだけなら、</span><span class="ph">あとで戻せます。</span></p>
+    </div>
+    <ul class="st-list" id="st-list"></ul>
+    <div class="sh-acts st-acts">
+      <button type="button" class="sh-close" id="st-close">閉じる</button>
+    </div>
+    <p class="sh-foot">ここで押すのは、<wbr>サイトを開く<wbr>ボタンだけです。<wbr>アプリで開いた時は、<wbr>その品物の<wbr>編集画面で、<wbr>上と同じ<wbr>止め方を<wbr>してください。<wbr>サイトで止めても、<wbr>台帳は<wbr>すぐには<wbr>変わりません<wbr>（パソコンの<wbr>Claudeが<wbr>次に<wbr>「売れたか」を<wbr>点検した時に<wbr>分かります）。</p>
+  </section>
+</div>
+
+<div class="sheet-back" id="asksheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="ak-what">
+    <header class="sh-head">
+      <p class="sh-grp" id="ak-grp"></p>
+      <h2 class="sh-what" id="ak-what" tabindex="-1"></h2>
+      <p class="sh-now" id="ak-now"></p>
+    </header>
+    <div class="st-lead">
+      <p id="ak-lead"></p>
+      <p class="ak-warn" id="ak-warn"></p>
+    </div>
+    <p class="sh-msg" id="ak-msg" role="status" aria-live="polite" hidden></p>
+    <div class="sh-acts" id="ak-acts">
+      <button type="button" class="sh-close" id="ak-close">閉じる</button>
+      <button type="button" class="pick sh-go" id="ak-go">お願いする</button>
+    </div>
+    <div class="sh-acts sh-confirm" id="ak-confirm" hidden>
+      <p class="cf-text" id="ak-cf" role="status" aria-live="polite"></p>
+      <button type="button" class="sh-close" id="ak-back">戻る</button>
+      <button type="button" class="pick sh-go" id="ak-cfgo">この内容で<wbr>お願いする</button>
+    </div>
+    <button type="button" class="sh-cancel" id="ak-cancel" hidden>このお願いを取り消す</button>
+    <p class="sh-foot" id="ak-foot"></p>
+  </section>
+</div>
+
+<div class="sheet-back" id="rtsheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="rt-what">
+    <header class="sh-head">
+      <p class="sh-grp" id="rt-grp"></p>
+      <h2 class="sh-what" id="rt-what" tabindex="-1"></h2>
+    </header>
+    <figure class="rt-now" id="rt-now"><img id="rt-img" alt="いまの写真"><figcaption>いまの写真</figcaption></figure>
+    <p class="rt-why" id="rt-why"></p>
+    <input type="file" id="rt-cam" accept="image/*" capture="environment">
+    <input type="file" id="rt-album" accept="image/*">
+    <div class="rt-picks">
+      <label class="pick" for="rt-cam"><span class="ph">カメラで</span><span class="ph">撮る</span></label>
+      <label class="pick" for="rt-album"><span class="ph">アルバムから</span><span class="ph">選ぶ</span></label>
+    </div>
+    <div class="rt-tips">
+      <p>きれいに撮るコツ</p>
+      <ul>
+        <li><span class="ph">1枚ずつ、</span><span class="ph">近づけて撮る</span></li>
+        <li><span class="ph">明るい所で、</span><span class="ph">影が入らないように</span></li>
+        <li><span class="ph">画面の品物を</span><span class="ph">1回さわって、</span><span class="ph">ピントが合ってから撮る</span></li>
+      </ul>
+    </div>
+    <p class="rt-msg" id="rt-msg" role="status" hidden></p>
+    <div class="sh-acts st-acts">
+      <button type="button" class="sh-close" id="rt-close">閉じる</button>
+    </div>
+    <p class="sh-foot">撮り直した写真は、<wbr>在庫の数を<wbr>増やさずに、<wbr>この品物の<wbr>写真と<wbr>差し替えます<wbr>（パソコンの<wbr>Claudeが<wbr>取り込んだ時）。</p>
+  </section>
+</div>
+
+<div class="sheet-back" id="cdsheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="cd-title">
+    <header class="sh-head">
+      <p class="sh-grp">ポケカ・ワンピなどのカード</p>
+      <h2 class="sh-what" id="cd-title" tabindex="-1">カードを撮って送る</h2>
+    </header>
+    <p class="cd-lead"><span class="ph">1枚のカードを、</span><span class="ph">写真1〜5枚で</span><span class="ph">送ります。</span><span class="ph">何枚にするかは</span><span class="ph">自由です。</span></p>
+    <ol class="cd-shots" id="cd-shots" aria-label="撮った写真"></ol>
+    <p class="cd-guide" id="cd-guide"></p>
+    <input type="file" id="cd-cam" accept="image/*" capture="environment">
+    <input type="file" id="cd-album" accept="image/*">
+    <div class="rt-picks" id="cd-picks">
+      <label class="pick" for="cd-cam"><span class="ph" id="cd-side1">1枚目を</span><span class="ph">カメラで撮る</span></label>
+      <label class="pick" for="cd-album"><span class="ph" id="cd-side2">1枚目を</span><span class="ph">アルバムから</span></label>
+    </div>
+    <p class="rt-msg" id="cd-msg" role="status" hidden></p>
+    <div class="memo-row cd-memo-row" id="cd-memo-row">
+      <label for="cd-memo"><span class="ph">傷があれば、</span><span class="ph">メモにひと言</span><span class="ph">（書かなくてOK）</span></label>
+      <input class="memo" id="cd-memo" type="text" maxlength="200" placeholder="例：右上に小さな傷" autocomplete="off">
+    </div>
+    <div class="sh-acts st-acts">
+      <button type="button" class="sh-close cd-send" id="cd-send" hidden>この1枚で送る</button>
+      <button type="button" class="sh-close cd-next" id="cd-next" hidden>次のカードを撮る</button>
+      <button type="button" class="sh-close" id="cd-close">閉じる</button>
+    </div>
+    <p class="sh-foot">1枚目は、<wbr>在庫の一覧に<wbr>出る写真です<wbr>（表がおすすめ）。<wbr>2枚目からは<wbr>自由です<wbr><span class="ph">（裏・スリーブ入り・</span><wbr><span class="ph">傷のアップなど）。</span><wbr>「この◯枚で送る」を<wbr>押すまでは<wbr>送りません。</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORE = "zaikoSnap.v1";
+  var MAX_EDGE = 2400;   // 長い辺をこれ以下に縮める（型番が読める大きさ。3200だと重くて送り直しが多かった＝2026-09-13）
+  var QUALITY = 0.85;
+  var PARALLEL = 1;      // 1枚ずつ送る（受け口は1枚ずつしか受け取れないので、同時に送ると待ち時間が伸びる）
+  var ID_RE = /^[A-Za-z0-9_-]{20,120}$/;
+  var KEY_RE = /^[A-Za-z0-9_-]{16,80}$/;
+
+  function byId(id) { return document.getElementById(id); }
+  var statusEl = byId("status"), statusText = byId("status-text");
+  var gate = byId("gate"), fileInput = byId("file"), drop = byId("drop"), memoInput = byId("memo");
+  var qnote = byId("qnote"), retryBtn = byId("retry"), bar = byId("bar");
+  var nWait = byId("n-wait"), nDone = byId("n-done"), nSent = byId("n-sent");
+  var list = byId("list"), shotsEl = byId("shots"), homeTip = byId("home-tip");
+  var tabsEl = byId("tabs"), tabHome = byId("tab-home"), tabSend = byId("tab-send"), tabStock = byId("tab-stock");
+  var paneHome = byId("pane-home"), paneSend = byId("pane-send"), paneStock = byId("pane-stock"), pcEl = byId("pc"), pcText = byId("pc-text");
+  var stockBox = byId("stock"), stockNote = byId("stock-note"), findInput = byId("find"), filterEl = byId("filter");
+  var sHave = byId("s-have"), sListed = byId("s-listed"), sNew = byId("s-new");
+  var moneyBox = byId("money"), mDone = byId("m-done"), mSub = byId("m-sub");
+
+  // 文節ごとに、途中で折れない塊にして入れる
+  function put(el, parts) {
+    el.textContent = "";
+    [].concat(parts).forEach(function (p) {
+      var s = document.createElement("span");
+      s.className = "ph";
+      s.textContent = p;
+      el.appendChild(s);
+    });
+  }
+  function setStatus(state, parts) { statusEl.setAttribute("data-state", state); put(statusText, parts); statusEl.hidden = state === "ok"; }   // 問題が無い時は出さない（パソコンのClaudeの表示と二重になるため）
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function fail(code) { var e = new Error(code); e.code = code; return e; }
+
+  // リンクの「#」より後ろ（サーバーには届かない所）から、送り先と合言葉を読む。
+  // 次にリンク無しで開いた時のために、この端末にも覚えておく。
+  function readConfig() {
+    var h = String(location.hash || "").replace(/^#/, "");
+    if (h) {
+      var q = new URLSearchParams(h);
+      var d = q.get("d") || "", k = q.get("k") || "";
+      if (ID_RE.test(d) && KEY_RE.test(k)) {
+        try { localStorage.setItem(STORE, JSON.stringify({ d: d, k: k })); } catch (e) {}
+        return { d: d, k: k };
+      }
+    }
+    try {
+      var s = JSON.parse(localStorage.getItem(STORE) || "null");
+      if (s && ID_RE.test(s.d) && KEY_RE.test(s.k)) return s;
+    } catch (e) {}
+    return null;
+  }
+  var CFG = readConfig();
+  var EXEC = CFG ? "https://script.google.com/macros/s/" + CFG.d + "/exec" : "";
+
+  // 送り直しても答えが変わらない返事（合言葉違い・大きすぎる・取り消しの時間切れ・値段や出品先の不備）は、送り直さずにそのまま伝える
+  var HARD = ["not_allowed", "too_large", "too_late", "bad_price", "no_channel", "bad_order", "no_order", "old_server", "already", "bad_store"];
+  // Googleのログイン状態に左右されないよう、Cookieを付けずに送る
+  function apiOnce(op, extra, ms, sendOnly) {
+    var body = { k: CFG.k, op: op };
+    if (extra) Object.keys(extra).forEach(function (x) { body[x] = extra[x]; });
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, ms || 30000) : null;
+    // sendOnly＝写真を送る時。受け口は受け取り終わると「返事は転送先で」と合図（302）を返す。
+    // その転送先（Googleの返事置き場）がときどき25〜30秒止まる（2026-09-13 実測）ので、合図が来たら中身は待たない
+    var opts = { method: "POST", body: JSON.stringify(body), redirect: sendOnly ? "manual" : "follow", credentials: "omit" };
+    if (ctl) opts.signal = ctl.signal;
+    function stop() { if (timer) clearTimeout(timer); }
+    return fetch(EXEC, opts).then(function (res) {
+      if (sendOnly && (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400))) {
+        stop();
+        return { ok: true, received: true };
+      }
+      return res.text().then(function (txt) {
+        stop();
+        var j = null;
+        try { j = JSON.parse(txt); } catch (e) {}
+        if (!j) throw fail("network");
+        // 受け口がまだ古い版（その問い合わせを知らない）＝電波のせいではない（2026-09-14 ページだけ先に新しくなった夜に実害の手前）
+        if (!j.ok) {
+          var er = fail(HARD.indexOf(j.error) !== -1 ? j.error : (j.error === "unknown op" ? "old_server" : "server"));
+          if (j.order) er.order = j.order;   // 断られた時のお願いの今の姿（取り消しが2本目で断られても、1本目で取り消せていたかが分かる・2026-09-16）
+          throw er;
+        }
+        return j;
+      });
+    }, function () {
+      stop();
+      throw fail("network");
+    });
+  }
+
+  // 読む問い合わせ（数・在庫）は、返事置き場が詰まる回がある（2026-09-13 16時の実測で3回に2回）。
+  // 3秒たっても返事が無ければ2本目を並べて聞き、先に返ってきた方を使う（読むだけなので2本聞いても害は無い）
+  function apiRace(op, extra, ms) {
+    return new Promise(function (resolve, reject) {
+      var started = 0, failed = 0, done = false, hedge = null;
+      function finish(ok, v) {
+        if (done) return;
+        done = true;
+        if (hedge) clearTimeout(hedge);
+        if (ok) resolve(v); else reject(v);
+      }
+      function start() {
+        if (done || started >= 2) return;
+        started += 1;
+        apiOnce(op, extra, ms).then(function (j) { finish(true, j); }, function (e) {
+          failed += 1;
+          if (e && HARD.indexOf(e.code) !== -1) return finish(false, e);
+          if (started < 2) return start();
+          if (failed >= started) finish(false, e);
+        });
+      }
+      start();
+      hedge = setTimeout(start, 3000);
+    });
+  }
+
+  // Googleの受け口は、たまに返事が遅れたり取りこぼしたりする（2026-09-13 実測で8回に1回）。
+  // 合言葉の間違いと大きすぎる写真以外は、間を空けて自動で送り直す（同じ写真は受け取り側で1枚にまとまる）。
+  function api(op, extra, ms, tries, onRetry) {
+    var n = 0, max = tries || 3;
+    function go() {
+      n += 1;
+      return apiRace(op, extra, ms)["catch"](function (e) {
+        if (e && HARD.indexOf(e.code) !== -1) throw e;
+        if (n >= max) throw e;
+        if (onRetry) onRetry(n);
+        return wait(800).then(go);
+      });
+    }
+    return go();
+  }
+
+  var 理由 = {
+    decode: ["写真を", "読み込めませんでした"],
+    heif: ["この形式（HEIF）は", "読めません。", "カメラ設定の", "「高効率」を", "オフに"],
+    too_large: ["大きすぎます"],
+    not_allowed: ["リンクが", "古いようです。", "新しいリンク（QRコード）で", "開き直してください"],
+    connect: ["つながりませんでした。", "少し待って、", "開き直してください"],
+    network: ["送れませんでした。", "少し待って", "「もう一度」を", "押してください"],
+    server: ["受け取り側で", "つまずきました。", "少し待って", "「もう一度」を"],
+    offline: ["電波が", "届いていないようです。", "電波の良い所で", "「もう一度」を"]
+  };
+  // 「電波」と言うのは、本当に電波が無いときだけ（受け口の取りこぼしを電波のせいにしない）
+  function reason(code) {
+    if ((code === "network" || code === "connect") && navigator.onLine === false) return 理由.offline;
+    return 理由[code] || 理由.network;
+  }
+
+  // 数（まだ台帳にしていない・台帳ずみ）を読む。写真を送るのはこの返事を待たなくてもできるので、読めなくても止めない（改2）
+  function refresh() {
+    return api("status", null, 15000, 3).then(function (s) {
+      nWait.textContent = String(s.pending);
+      nDone.textContent = String(s.done);
+      LAST_PENDING = Number(s.pending) || 0;
+      if (s.pcSeen !== undefined) setPc(s.pcSeen, s.now);
+      renderHome();
+      setStatus("ok", ["写真を", "送れます"]);
+    }, function (e) {
+      if (e && e.code === "not_allowed") setStatus("bad", reason("not_allowed"));
+      else if (navigator.onLine === false) setStatus("bad", reason("offline"));
+    });
+  }
+
+  // どの写真も JPEG に描き直してから送る：
+  // 大きすぎる写真を縮める／読めない形式を避ける／位置情報などの付属データを落とす
+  function readAsDataURL(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result)); };
+      fr.onerror = function () { reject(fr.error); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  function loadImage(src) {
+    return new Promise(function (resolve, reject) {
+      var im = new Image();
+      im.onload = function () { resolve(im); };
+      im.onerror = function () { reject(new Error("decode")); };
+      im.src = src;
+    });
+  }
+  function decode(file) {
+    return readAsDataURL(file).then(loadImage).then(function (im) {
+      return { src: im, w: im.naturalWidth, h: im.naturalHeight };
+    })["catch"](function () {
+      if (typeof createImageBitmap !== "function") throw new Error("decode");
+      return createImageBitmap(file).then(function (bm) { return { src: bm, w: bm.width, h: bm.height }; });
+    });
+  }
+  function toJpeg(file) {
+    return decode(file).then(function (d) {
+      if (!d.w || !d.h) throw new Error("decode");
+      var s = Math.min(1, MAX_EDGE / Math.max(d.w, d.h));
+      var c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(d.w * s));
+      c.height = Math.max(1, Math.round(d.h * s));
+      var g = c.getContext("2d");
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(d.src, 0, 0, c.width, c.height);
+      if (d.src.close) d.src.close();
+      var ts = Math.min(1, 160 / Math.max(c.width, c.height));   // 送った写真の行に出す小さな絵（端末に30枚ぶん残すので小さく）
+      var tc = document.createElement("canvas");
+      tc.width = Math.max(1, Math.round(c.width * ts));
+      tc.height = Math.max(1, Math.round(c.height * ts));
+      tc.getContext("2d").drawImage(c, 0, 0, tc.width, tc.height);
+      var thumb = tc.toDataURL("image/jpeg", 0.72);
+      tc.width = 0; tc.height = 0;
+      return new Promise(function (resolve, reject) {
+        c.toBlob(function (b) {
+          c.width = 0; c.height = 0;
+          if (b && b.size) resolve({ blob: b, thumb: thumb }); else reject(new Error("decode"));
+        }, "image/jpeg", QUALITY);
+      });
+    });
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  // 写真ごとの受付番号。送り直しても同じ番号なので、受け取り側で1枚にまとまる
+  function makeUid() {
+    var t = new Date();
+    return t.getFullYear() + pad(t.getMonth() + 1) + pad(t.getDate()) + "-" +
+      pad(t.getHours()) + pad(t.getMinutes()) + pad(t.getSeconds()) + "-" +
+      (Math.random().toString(36) + "00000000").slice(2, 10);
+  }
+
+  // 送る（2026-09-13 改2）：受け取り済みの合図（302）が来たら、返事置き場は待たない。
+  // 念のため「届いているか」を1回だけ短く聞く（6秒）。聞けなければ sure:false（確かめ中）で返す＝控えは消さず、写真の行方の問い合わせで確かめる。ただし合言葉が違うと言われたら止める。
+  // （2026-09-15 直し：前は「聞けなければ受け取り済み」とみなして控えを消していた＝届いていない写真が黙って消えることがあった）
+  // 送る途中で途切れた時は、送り直す前に「届いているか」を1回聞く（同じ写真を何度も送らない）
+  function send(b64, memo, uid, onStep) {
+    var tries = 0;
+    function hasOnce() {
+      return apiOnce("has", { uid: uid }, 6000).then(function (h) { return h && h.has ? "yes" : "no"; }, function (e) { if (e && e.code === "not_allowed") throw e; return "unknown"; });
+    }
+    function attempt() {
+      tries += 1;
+      return apiOnce("save", { b64: b64, memo: memo, uid: uid }, 90000, true).then(function () {
+        if (onStep) onStep("confirm");
+        return hasOnce().then(function (r) {
+          if (r !== "no") return { ok: true, sure: r === "yes" };
+          return wait(1500).then(hasOnce).then(function (r2) {
+            if (r2 !== "no") return { ok: true, sure: r2 === "yes" };
+            if (tries >= 3) throw fail("server");
+            return attempt();
+          });
+        });
+      }, function (e) {
+        if (e && HARD.indexOf(e.code) !== -1) throw e;
+        if (tries >= 3) throw e;
+        if (onStep) onStep("retry");
+        return wait(1000).then(hasOnce).then(function (r) {
+          return r === "yes" ? { ok: true, sure: true } : attempt();
+        });
+      });
+    }
+    return attempt();
+  }
+
+  var queue = [], running = 0, failed = [], sent = 0;
+  // 確かめ中＝保存の合図は来たが、届いたかをまだ確かめられていない写真（受付番号→送り直せる中身）。届いたと分かるまで控えは消さない（2026-09-15）
+  // 行方が「無い」のが10分続いたら同じ受付番号で送り直す。自動は1枚3回まで。それでも届かなければ lost（「届いていません」）
+  var checking = {}, NONE_MS = 600000, AUTO_MAX = 3;
+  function lostN() { return Object.keys(checking).filter(function (u) { return checking[u].lost; }).length; }
+
+  // ---- 受け付けた写真をスマホの中に残す（ページを閉じても、次に開いた時に続きから送る・届いたら消す）＝2026-09-13 ----
+  var QDB = "zaikoSnapQueue", QSTORE = "jobs", qdbp = null, SAFE = null;   // SAFE＝スマホの中に写真を残せるか（分かるまでは「残せない」として扱う）
+  function qdb() {
+    if (qdbp) return qdbp;
+    qdbp = new Promise(function (resolve) {
+      try {
+        var rq = indexedDB.open(QDB, 1);
+        rq.onupgradeneeded = function () { rq.result.createObjectStore(QSTORE, { keyPath: "uid" }); };
+        rq.onsuccess = function () { resolve(rq.result); };
+        rq.onerror = function () { resolve(null); };
+      } catch (e) { resolve(null); }
+    });
+    qdbp.then(function (d) { if (!d) SAFE = false; else if (SAFE === null) SAFE = true; showQueue(); renderShots(); });
+    return qdbp;
+  }
+  function qdo(mode, fn) {
+    return qdb().then(function (d) {
+      if (!d) return null;
+      return new Promise(function (resolve) {
+        try {
+          var tx = d.transaction(QSTORE, mode), req = fn(tx.objectStore(QSTORE));
+          tx.oncomplete = function () { resolve(req ? req.result : null); };
+          tx.onerror = function () { resolve(null); };
+          tx.onabort = function () { resolve(null); };
+        } catch (e) { resolve(null); }
+      });
+    });
+  }
+  function keep(job) {
+    return qdo("readwrite", function (st) { return st.put({ uid: job.uid, blob: job.file, name: job.name, size: job.size, lm: job.lm, memo: job.memo, at: Date.now() }); })
+      .then(function (r) { if (!r && SAFE !== false) { SAFE = false; showQueue(); renderShots(); } return r; });   // 残せなかった＝「閉じても大丈夫」と言わない
+  }
+  function forget(uid) { return qdo("readwrite", function (st) { return st["delete"](uid); }); }
+  function kept() { return qdo("readonly", function (st) { return st.getAll(); }); }
+
+  // ---- 送った写真の記録（この端末に残す）：写真ごとに 受付→届いた→見分け→在庫 を見せる ----
+  var HIST_KEY = "zaikoSnap.hist.v1", hist = loadHist(), PC_ON = null, LAST_PENDING = null;
+  function loadHist() {
+    try { var h = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); return Array.isArray(h) ? h : []; } catch (e) { return []; }
+  }
+  function saveHist() {
+    // 30件を超えたら、行方が決まった古い写真から捨てる。確かめ中・届かず・電波待ちは捨てない（捨てると1分おきの行方の問い合わせから外れ、そのページでは送り直せない＝2026-09-15 点検その2の検算）
+    var keep = function (h) { return h.state === "確かめ中" || h.state === "届かず" || h.state === "待ち"; };
+    var room = 30 - hist.filter(keep).length;
+    hist = hist.filter(function (h) { return keep(h) || room-- > 0; });
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch (e) {
+      hist.forEach(function (h, i) { if (i > 8) h.thumb = ""; });   // 保存場所がいっぱい＝古い写真の小さな絵から捨てる
+      try { localStorage.setItem(HIST_KEY, JSON.stringify(hist)); } catch (e2) {}
+    }
+  }
+  // その札（ラベル）が、いまの在庫の一覧にまだあるか。★一覧をまだ読めていない時は「ある」扱い（読めないだけで「外した」と言わない）
+  function inStock(lab) {
+    if (!lab || !STOCK || !STOCK.groups) return true;
+    var hit = false;
+    STOCK.groups.forEach(function (g) { (g.items || []).forEach(function (it) { if (it.label === lab) hit = true; }); });
+    return hit;
+  }
+  function histOf(uid) {
+    for (var i = 0; i < hist.length; i++) if (hist[i].uid === uid) return hist[i];
+    return null;
+  }
+  function mark(uid, patch) {
+    var h = histOf(uid);
+    if (!h) { h = { uid: uid, at: Date.now(), state: "受付" }; hist.unshift(h); }
+    Object.keys(patch || {}).forEach(function (k) { h[k] = patch[k]; });
+    saveHist();
+    renderShots();
+  }
+  var SHOW_ALL = false;
+  function renderShots() {
+    shotsEl.textContent = "";
+    var all = hist.slice(0, 30), show = SHOW_ALL ? all : all.slice(0, 5);
+    list.hidden = !all.length;
+    show.forEach(function (h) {
+      var st = h.state || "受付", kind = "busy", main = "送っています…", sub = "";
+      // ★在庫から外した品の写真が「在庫に入りました」のまま残ると混乱する（2026-09-23 本人「ラプラスいるけど、これキャンセルしたよね」）
+      //   ＝消さずに、いまの事実を出す。消すと「送ったのに消えた＝届かなかった？」と分からなくなる
+      if (st === "在庫") {
+        if (inStock(h.label)) { kind = "ok"; main = "在庫に入りました"; sub = h.label || ""; }
+        else { kind = "off"; main = "在庫から外しました"; sub = (h.label ? h.label + "　" : "") + "撮り直し・取り消しなどで、いまは在庫にありません"; }
+      }
+      else if (st === "届いた") {
+        kind = "now";
+        if (PC_ON === false) { main = "届きました"; sub = "パソコンのClaudeが止まっています。動いた時に在庫へ入ります"; }
+        else main = "届きました（見分け中）";
+      }
+      else if (st === "確かめ中") { kind = "now"; main = "届いたか確かめています"; sub = SAFE ? "届いたと分かるまで、写真はスマホに残します" : "送り終わるまで、この画面を閉じないでください"; }
+      else if (st === "届かず") { kind = "bad"; main = "届いていません"; sub = "「いますぐ送り直す」を押すと、もう一度送ります"; }
+      else if (st === "待ち") { kind = "bad"; main = "電波待ち"; sub = "電波が戻ったら、自動で送り直します"; }
+      else if (st === "bad") { kind = "bad"; main = "送れませんでした"; sub = reason(h.code || "network").join(""); }
+      var li = el("li", "shot2");
+      li.setAttribute("data-kind", kind);
+      if (h.thumb) {
+        var im = document.createElement("img");
+        im.src = h.thumb;
+        im.alt = "送った写真";
+        li.appendChild(im);
+      } else {
+        li.appendChild(el("span", "ph0"));
+      }
+      var box = el("div", "");
+      var m = el("p", "smain");
+      m.appendChild(el("span", "sdot"));
+      m.appendChild(document.createTextNode(main));
+      box.appendChild(m);
+      if (sub) box.appendChild(segs(el("p", "ssub"), sub));
+      var d = new Date(h.at || Date.now());
+      box.appendChild(el("p", "swhen", (d.getMonth() + 1) + "月" + d.getDate() + "日 " + pad(d.getHours()) + ":" + pad(d.getMinutes())));
+      li.appendChild(box);
+      shotsEl.appendChild(li);
+    });
+    if (all.length > 5) {
+      var more = el("button", "more", SHOW_ALL ? "新しい5枚だけにする" : "前の写真も見る（全部で" + all.length + "枚）");
+      more.type = "button";
+      more.addEventListener("click", function () { SHOW_ALL = !SHOW_ALL; renderShots(); });
+      var li2 = el("li", "");
+      li2.appendChild(more);
+      shotsEl.appendChild(li2);
+    }
+  }
+
+  function enqueue(items) {
+    if (!items.length) return;
+    retryBtn.hidden = true;
+    items.forEach(function (it) {
+      var f = it.file || {};
+      var job = { file: it.file, memo: it.memo, uid: it.uid || makeUid(), name: it.name || f.name || "", size: it.size || f.size || 0, lm: it.lm || f.lastModified || 0 };
+      if (it.resumed) {
+        job.kept = null;   // 前に残した分はもうスマホの中に入っている
+        if (!histOf(job.uid)) mark(job.uid, { state: "受付", at: it.at || Date.now() });
+      } else {
+        job.kept = keep(job);   // 受け付けた瞬間にスマホの中へ残す
+        mark(job.uid, { state: "受付", at: Date.now() });
+      }
+      queue.push(job);
+    });
+    showQueue();
+    pump();
+  }
+
+  function pump() {
+    while (running < PARALLEL && queue.length) {
+      running += 1;
+      work(queue.shift()).then(function () { running -= 1; showQueue(); pump(); settle(); });
+    }
+  }
+
+  function work(job) {
+    var f = job.file;
+    mark(job.uid, { state: "受付", code: "" });
+    return toJpeg(f)["catch"](function () {
+      var heif = /hei[cf]/i.test((f && f.type) || "") || /[.]hei[cf]$/i.test(job.name || "");
+      throw fail(heif ? "heif" : "decode");
+    }).then(function (r) {
+      mark(job.uid, { thumb: r.thumb });
+      return readAsDataURL(r.blob);
+    }).then(function (url) {
+      var b64 = url.slice(url.indexOf(",") + 1);
+      if (b64.length > 27000000) throw fail("too_large");
+      // 撮影ID＝スマホの元のファイル名・大きさ・時刻。同じ1枚をもう一度送った時に、取り込み側で「同じ写真」と分かる
+      var sid = "［撮影ID " + (job.name || "名前なし") + "／" + (job.size || 0) + "／" + (job.lm || 0) + "］";
+      return send(b64, (job.memo ? job.memo + " " : "") + sid, job.uid);
+    }).then(function (res) {
+      var h = histOf(job.uid);
+      if (!(res && res.sure) && !(h && (h.state === "届いた" || h.state === "在庫"))) {
+        // 保存の合図は来たが、届いたかを確かめられなかった＝控えは消さずに「確かめ中」。写真の行方の問い合わせで確かめる（2026-09-15）
+        checking[job.uid] = { file: job.file, memo: job.memo, uid: job.uid, name: job.name, size: job.size, lm: job.lm, resumed: true };
+        mark(job.uid, { state: "確かめ中", none: 0 });
+        return;
+      }
+      sent += 1;
+      nSent.textContent = String(sent);
+      mark(job.uid, { state: "届いた" });
+      return Promise.resolve(job.kept).then(function () { return forget(job.uid); });
+    }, function (e) {
+      var code = (e && e.code) || "network";
+      if (code === "decode" || code === "heif" || code === "too_large") {
+        mark(job.uid, { state: "bad", code: code });
+        return Promise.resolve(job.kept).then(function () { return forget(job.uid); });
+      }
+      if (code === "not_allowed") { mark(job.uid, { state: "bad", code: code }); return; }
+      // 電波や受け口のつまずき＝ボタンを押さなくても、あとで自動で送り直す（スマホの中に残してある）
+      mark(job.uid, { state: "待ち", code: code });
+      failed.push({ file: job.file, memo: job.memo, uid: job.uid, name: job.name, size: job.size, lm: job.lm, resumed: true });
+    });
+  }
+
+  function settle() {
+    if (running || queue.length) return;
+    refresh();
+    showQueue();
+    if (STOCK) renderRetakes();   // 撮り直しの「送っています」→「送りました」を、届いた時に切り替える
+    if (Object.keys(checking).length) track();   // 確かめ中の写真があれば、すぐ行方を聞く（あとは1分おき）
+    if (failed.length) { retryBtn.hidden = false; scheduleRetry(false); return; }
+    retryStep = 0;
+    if (lostN()) retryBtn.hidden = false;   // 送り直しても届かなかった写真＝押せば、もう一度送れる
+  }
+
+  // 自動で送り直す：10秒→30秒→1分→2分→以後3分おき。電波が戻った時・ページに戻った時はすぐ
+  var retryTimer = null, retryStep = 0, RETRY_MS = [10000, 30000, 60000, 120000, 180000];
+  function scheduleRetry(now) {
+    if (!failed.length) return;
+    if (retryTimer) clearTimeout(retryTimer);
+    var ms = now ? 0 : RETRY_MS[Math.min(retryStep, RETRY_MS.length - 1)];
+    retryStep += 1;
+    retryTimer = setTimeout(function () { retryTimer = null; retryNow(); }, ms);
+  }
+  function retryNow() {
+    if (!failed.length || running || queue.length) return;
+    var again = failed;
+    failed = [];
+    enqueue(again);
+  }
+  window.addEventListener("online", function () { scheduleRetry(true); });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !CFG) return;
+    scheduleRetry(true);
+    refresh();
+    track();
+  });
+
+  function showQueue() {
+    var busy = running + queue.length, waitN = failed.length, lost = lostN(), checkN = Object.keys(checking).length - lost;
+    // スマホの中に写真を残せない時は「閉じても大丈夫」と言わない（閉じると、まだ届いていない写真が消える）
+    var stay = SAFE ? [] : ["送り終わるまで、", "この画面を", "閉じないでください"], dot = SAFE ? "" : "。";
+    if (busy) {
+      qnote.setAttribute("data-kind", "busy");
+      put(qnote, ["送っています", "（のこり" + busy + "枚）。"].concat(SAFE ? ["閉じても大丈夫。", "次に開いた時に", "続きから送ります"] : stay));
+    } else if (lost) {
+      qnote.setAttribute("data-kind", "wait");
+      put(qnote, ["届いていない写真が", lost + "枚", "あります。", "下の", "「いますぐ送り直す」を", "押してください" + dot].concat(stay));
+    } else if (waitN) {
+      qnote.setAttribute("data-kind", "wait");
+      put(qnote, ["届いていない写真が", waitN + "枚。", "電波が戻ったら", "自動で送ります" + dot].concat(stay));
+    } else if (checkN) {
+      qnote.setAttribute("data-kind", "wait");
+      put(qnote, ["届いたか", "確かめています", "（" + checkN + "枚）" + dot].concat(stay));
+    } else if (sent) {
+      qnote.setAttribute("data-kind", "ok");
+      put(qnote, ["送った写真は、", "全部届きました"]);
+    }
+    qnote.hidden = !(busy || waitN || checkN || lost || sent);
+  }
+
+  retryBtn.addEventListener("click", function () {
+    retryStep = 0;
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    Object.keys(checking).forEach(function (u) { if (checking[u].lost) { delete checking[u].lost; failed.push(checking[u]); delete checking[u]; } });   // 「届いていません」の写真も、押された時は同じ受付番号で送り直す
+    retryNow();
+  });
+
+  fileInput.addEventListener("change", function () {
+    var memo = memoInput.value.trim();
+    var picked = Array.prototype.slice.call(fileInput.files || []).filter(function (f) { return f && f.size > 0; });
+    fileInput.value = "";
+    if (picked.length) memoInput.value = "";   // ★メモは選んだ写真にだけ付ける＝次に選ぶ写真に前のメモが付いていた（2026-09-16 点検その3）
+    enqueue(picked.map(function (f) { return { file: f, memo: memo }; }));
+  });
+
+  // ---- 届いた写真の行方と、パソコンのClaudeの様子（1分おき・ページを見ている間だけ）----
+  var trackBusy = false;
+  function track() {
+    if (trackBusy || !CFG) return;
+    var uids = hist.filter(function (h) { return h.state === "届いた" || h.state === "待ち" || h.state === "受付" || h.state === "確かめ中" || h.state === "届かず"; }).map(function (h) { return h.uid; }).slice(0, 40);
+    if (!uids.length) return;
+    trackBusy = true;
+    api("track", { uids: uids }, 20000, 2).then(function (j) {
+      trackBusy = false;
+      if (j.pcSeen !== undefined) setPc(j.pcSeen, j.now);
+      var items = j.items || {}, changed = false, again = [];
+      Object.keys(items).forEach(function (u) {
+        var it = items[u], h = histOf(u);
+        if (!h || h.state === "在庫") return;
+        if (it.state === "none") {
+          // 確かめ中の写真が受け口に無い：「無い」が10分続いたら、同じ受付番号で送り直す（受け口は受付番号で二重を防ぐ）。自動は1枚3回まで
+          if (h.state !== "確かめ中" || !checking[u]) return;
+          if (!h.none) { h.none = Date.now(); changed = true; return; }
+          if (Date.now() - h.none < NONE_MS) return;
+          h.none = 0;
+          changed = true;
+          if ((h.resends || 0) >= AUTO_MAX) { h.state = "届かず"; checking[u].lost = true; return; }   // それでも届かない＝「届いていません」として残し、本人に知らせる
+          h.resends = (h.resends || 0) + 1;
+          again.push(checking[u]);
+          delete checking[u];
+          return;
+        }
+        if (it.state !== "done" && it.state !== "arrived") return;
+        if (it.state === "arrived" && h.state === "届いた") return;
+        if (queue.some(function (q) { return q.uid === u; })) return;   // いま送っている最中の写真は、送り終わりを待つ
+        failed = failed.filter(function (q) { return q.uid !== u; });   // 受け口に届いていた＝送り直さない
+        if (checking[u]) { delete checking[u]; sent += 1; nSent.textContent = String(sent); }   // 確かめ中だった写真が届いていた＝ここで初めて控えを消す
+        forget(u);
+        if (it.state === "done") { h.state = "在庫"; h.label = it.label || ""; } else { h.state = "届いた"; }
+        changed = true;
+      });
+      if (changed) { saveHist(); showQueue(); }
+      if (again.length) enqueue(again);
+      else if (!running && !queue.length) retryBtn.hidden = !(failed.length || lostN());
+      renderShots();
+    }, function () { trackBusy = false; });
+  }
+  function ago(min) {
+    return min < 60 ? min + "分前" : (min < 1440 ? Math.floor(min / 60) + "時間前" : Math.floor(min / 1440) + "日前");
+  }
+  function setPc(seen, now) {
+    seen = Number(seen) || 0;
+    now = Number(now) || Date.now();
+    if (!seen) {
+      PC_ON = null;
+      pcEl.setAttribute("data-state", "wait");
+      put(pcText, ["パソコンのClaudeの", "様子は、", "まだ分かりません"]);
+    } else {
+      var min = Math.max(0, Math.round((now - seen) / 60000));
+      PC_ON = min <= 5;
+      pcEl.setAttribute("data-state", PC_ON ? "on" : "off");
+      if (PC_ON) put(pcText, ["パソコンのClaude：", "動いています", "（" + (min ? min + "分前に確認" : "たった今確認") + "）"]);
+      else put(pcText, ["パソコンのClaude：", "止まっています", "（最後に確認：" + ago(min) + "）。", "届いた写真は、", "動いた時に", "在庫へ入ります"]);
+    }
+    renderShots();
+  }
+  function setN(node, n, unit) {
+    node.textContent = n == null ? "–" : String(n);
+    node.appendChild(el("small", "", unit));
+  }
+  function renderHome() {
+    setN(byId("n-todo-wait"), LAST_PENDING, "枚");
+    byId("todo-wait").setAttribute("data-hot", LAST_PENDING ? "1" : "0");
+    var price = null, trades = null;
+    if (STOCK && STOCK.groups) {
+      price = 0;
+      STOCK.groups.forEach(function (g) {
+        (g.items || []).forEach(function (it) {
+          var od = orderFor(g, it);
+          if (it.state === "未出品" && (!it.price || String(it.price).indexOf("未定") !== -1) && !(od && OPEN_STATES[od.state])) price += it.count || 0;
+        });
+      });
+      trades = (STOCK.trades || []).length;
+    }
+    setN(byId("n-todo-price"), price, "枚");
+    byId("todo-price").setAttribute("data-hot", price ? "1" : "0");
+    setN(byId("n-todo-trade"), trades, "件");
+    var oc = openCount();
+    setN(byId("n-todo-orders"), oc, "件");
+    byId("todo-orders").setAttribute("data-hot", oc ? "1" : "0");
+    renderRetakes();
+  }
+  byId("todo-wait").addEventListener("click", function () { showTab("send"); });
+  byId("todo-price").addEventListener("click", function () { showTab("stock"); var b = filterEl.querySelector("button[data-f=未出品]"); if (b) b.click(); });
+  byId("todo-trade").addEventListener("click", function () { showTab("stock"); var b = filterEl.querySelector("button[data-f=売れた]"); if (b) b.click(); });
+  byId("todo-orders").addEventListener("click", function () { loadOrders(); if (!ordersBox.hidden) ordersBox.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  byId("home-pick").addEventListener("click", function () { showTab("send"); fileInput.click(); });
+
+  ["dragenter", "dragover"].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add("on"); });
+  });
+  ["dragleave", "drop"].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove("on"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    if (!e.dataTransfer || !e.dataTransfer.files) return;
+    var memo = memoInput.value.trim();
+    if (e.dataTransfer.files.length) memoInput.value = "";
+    enqueue(Array.prototype.slice.call(e.dataTransfer.files).map(function (f) { return { file: f, memo: memo }; }));
+  });
+
+  // 「ホーム画面に追加」の案内を、スマホの種類で出し分ける
+  var ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/.test(ua)) {
+    put(homeTip, ["次から", "すぐ開けるように：", "Safariの", "共有ボタン（□に↑）", "→「ホーム画面に追加」"]);
+    homeTip.hidden = false;
+  } else if (/Android/.test(ua)) {
+    put(homeTip, ["次から", "すぐ開けるように：", "ブラウザの", "「⋮」", "→「ホーム画面に追加」"]);
+    homeTip.hidden = false;
+  }
+
+  // ---- 在庫を見る（Claudeが台帳から作った一覧を読むだけ。ここからは書き換えない）----
+  var STOCK = null, stockBusy = false, curFilter = "all";
+  // 作品ごとの開け閉め（2026-09-16 本人「カテゴリごとにプルダウンできる形式に…scrollが長いので」）
+  // ★ふだんは閉じる。開け閉めはスマホに覚える＝1分おきの作り直しや開き直しで閉じない
+  // ★しぼりこみ・検索の時は当てはまる作品を開いて出す（覚えている開け閉めは変えない＝その間だけの開け閉めは TEMP_OPEN）。作品が1つだけなら開く
+  var GROUP_KEY = "zaikoSnap.groupOpen.v1", GROUP_OPEN = {}, TEMP_OPEN = {}, TEMP_SIG = "";
+  try { var groupOpen0 = JSON.parse(localStorage.getItem(GROUP_KEY) || "null"); if (groupOpen0 && typeof groupOpen0 === "object") GROUP_OPEN = groupOpen0; } catch (e) {}
+  function saveGroupOpen() { try { localStorage.setItem(GROUP_KEY, JSON.stringify(GROUP_OPEN)); } catch (e) {} }
+  function groupForced() { return !!findInput.value.trim() || curFilter !== "all"; }
+  function updateAllBtn() {
+    var btn = byId("grp-all"), ds = [].slice.call(stockBox.querySelectorAll("details.grp"));
+    btn.hidden = ds.length < 2;
+    btn.textContent = ds.some(function (d) { return !d.open; }) ? "全部ひらく" : "全部とじる";
+  }
+  var ORDER = { "未出品": 1, "出品中": 2, "その他": 3, "売れた": 4 };
+  var CHIP = { "未出品": "まだ出していない", "出品中": "出品中", "売れた": "売れた", "その他": "その他" };
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  // 名前を「／・＋（）」などの区切りで小さな塊に分けて入れる（言葉の途中で折れないように）。空白は空白のまま残す
+  var OPEN = "（(「【";
+  var SEP = "）)」】／/・＋、";
+  var GAP = " " + String.fromCharCode(12288);
+  function segs(target, text, cut) {
+    var s = String(text || ""), cur = "", out = [];
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i);
+      if (GAP.indexOf(ch) !== -1) { if (cur) out.push(cur); cur = ""; if (out.length && out[out.length - 1] !== " ") out.push(" "); }
+      else if (OPEN.indexOf(ch) !== -1) { if (cur) out.push(cur); cur = ch; }
+      else if (SEP.indexOf(ch) !== -1) { cur += ch; out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    if (cur) out.push(cur);
+    out.forEach(function (part) {
+      if (part === " ") target.appendChild(document.createTextNode(" "));
+      else cutLong(part, cut).forEach(function (p) { target.appendChild(el("span", "ph", p)); });
+    });
+    return target;
+  }
+  // 狭い欄の名前は、cut字より長い塊を漢字とカタカナの境でさらに分ける（「大海賊シールウエハース」が「ウエハー／ス」と折れた・2026-09-15）。cut を渡さなければ今までどおり
+  function cutLong(part, cut) {
+    if (!cut || part.length <= cut) return [part];
+    var res = [], piece = "", prev = "";
+    for (var i = 0; i < part.length; i++) {
+      var ch = part.charAt(i), k = /[㐀-鿿々]/.test(ch) ? "漢" : /[ァ-ヺー]/.test(ch) ? "カ" : "";
+      if (piece && prev && k && prev !== k) { res.push(piece); piece = ""; }
+      piece += ch;
+      prev = k;
+    }
+    if (piece) res.push(piece);
+    return res;
+  }
+  // 文（理由など）は、ひらがなの続き（2〜8字）を1つの塊にして入れる＝途中で折らない（文節の見分けが「に／じんでいる」「読みに／くい」と折った・2026-09-15）
+  function glue(target, text) {
+    var s = String(text || ""), re = /[ぁ-ゟ]+/g, last = 0, m;
+    while ((m = re.exec(s))) {
+      if (m[0].length < 2 || m[0].length > 8) continue;
+      if (m.index > last) target.appendChild(document.createTextNode(s.slice(last, m.index)));
+      target.appendChild(el("span", "kana", m[0]));
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) target.appendChild(document.createTextNode(s.slice(last)));
+    return target;
+  }
+  function when(s) {
+    var p = String(s || "").split("T"), d = (p[0] || "").split("-");
+    if (d.length !== 3) return "";
+    return Number(d[1]) + "月" + Number(d[2]) + "日 " + (p[1] || "").slice(0, 5);
+  }
+  function showTab(which) {
+    tabHome.setAttribute("aria-pressed", String(which === "home"));
+    tabSend.setAttribute("aria-pressed", String(which === "send"));
+    tabStock.setAttribute("aria-pressed", String(which === "stock"));
+    paneHome.hidden = which !== "home";
+    paneSend.hidden = which !== "send";
+    paneStock.hidden = which !== "stock";
+    if (which === "stock") { loadStock(); loadOrders(); }
+    if (which === "home") { refresh(); loadStock(); loadOrders(); }
+    // ★「送った写真」は、在庫の一覧が分からないと「在庫から外した品」を見分けられない
+    //   ＝このタブでも一覧を読む（2026-09-23 直し漏れ＝開いた最初のタブがここなので、読まないままだった）
+    if (which === "send") { track(); loadStock(); }
+  }
+  // 在庫の一覧は、スマホに前回読んだ分を覚えておき、開いたらすぐ出す（2026-09-13）。
+  // 返事置き場が詰まっても一覧が見える。新しい一覧は裏で読み、届いたら差し替える。読めなくても出ている一覧は消さない。
+  var STOCK_KEY = "zaikoSnap.stock.v1", stockCached = false;
+  function saveStock(s) {
+    try { localStorage.setItem(STOCK_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  function cachedStock() {
+    try {
+      var s = JSON.parse(localStorage.getItem(STOCK_KEY) || "null");
+      return s && s.groups ? s : null;
+    } catch (e) { return null; }
+  }
+  function noteCached(tail) {
+    put(stockNote, ["台帳の更新：", when(STOCK.updated), "（前に", "読んだ一覧）。"].concat(tail));
+  }
+  function loadStock() {
+    if (stockBusy) return;
+    stockBusy = true;
+    if (!STOCK) {
+      var c = cachedStock();
+      if (c) { STOCK = c; stockCached = true; renderStock(); renderShots(); }   // ★覚えている一覧でも、外した品の写真はすぐ見分けられる（2026-09-23）
+    }
+    if (stockCached) noteCached(["新しいのを", "読んでいます…"]);
+    else if (!STOCK) put(stockNote, ["在庫の", "一覧を", "読んでいます…"]);
+    api("stock", null, 15000, 4, function () {
+      if (stockCached) noteCached(["新しいのを", "読むのに", "時間が", "かかっています…"]);
+      else if (!STOCK) put(stockNote, ["在庫の一覧を", "読むのに", "時間が", "かかっています…"]);
+    }).then(function (j) {
+      stockBusy = false;
+      STOCK = j.stock || null;
+      stockCached = false;
+      if (STOCK && STOCK.groups) saveStock(STOCK);
+      renderStock();
+      renderShots();   // ★在庫から外した品の写真の行を出し直す（在庫の一覧が読めてから決まる・2026-09-23）
+    }, function (e) {
+      stockBusy = false;
+      if (e && e.code === "not_allowed") put(stockNote, reason("not_allowed"));
+      else if (stockCached) noteCached(["新しい一覧が", "読めなかったので、", "この一覧を", "出しています"]);
+      else if (STOCK) put(stockNote, ["台帳の更新：", when(STOCK.updated), "（新しい一覧は", "読めませんでした）"]);
+      else put(stockNote, reason("connect"));
+    });
+  }
+  function renderStock() {
+    stockBox.textContent = "";
+    renderHome();
+    if (!STOCK || !STOCK.groups) {
+      sHave.textContent = "–"; sListed.textContent = "–"; sNew.textContent = "–";
+      moneyBox.hidden = true;
+      put(stockNote, ["まだ", "在庫の一覧が", "届いていません。", "Claudeが", "台帳から送ると", "ここに出ます。"]);
+      return;
+    }
+    var t = STOCK.totals || {};
+    sHave.textContent = String((t["出品中"] || 0) + (t["未出品"] || 0) + (t["その他"] || 0));
+    sListed.textContent = String(t["出品中"] || 0);
+    sNew.textContent = String(t["未出品"] || 0);
+    // 純利の累計（2026-09-15 本人「取引完了して入金確認できたら…手数料とか引いた純利の累計金額の提示」）＝収支表の手取り（入金まで済んだ分）。売れた物がまだ無ければ出さない
+    var mo = STOCK.money || null;
+    moneyBox.hidden = !(curFilter === "売れた" && mo && (mo.doneN || mo.waitN));   // ★「売れた」でしぼった時だけ、売れた品物の一覧の上に出す（2026-09-15 本人「純利はうれた　の項目で出して」）
+    if (!moneyBox.hidden) {
+      mDone.textContent = "";
+      mDone.appendChild(document.createTextNode(yen(mo.done)));
+      mDone.appendChild(el("small", "", "（" + (mo.doneN || 0) + "件）"));
+      put(mSub, (mo.waitN ? ["入金待ち " + yen(mo.wait) + "（" + mo.waitN + "件）。"] : []).concat(["手数料と送料を", "引いた手取りの合計です", "（仕入れの値段は", "引いていません）。"], mo.rawN ? ["うち" + mo.rawN + "件は", "手取りが未記入で、", "売値のまま", "足しています。"] : []));   // 手取りが空の売上＝売値のまま足している（2026-09-15 読み合わせ）
+    }
+    if (stockCached) noteCached([]); else put(stockNote, ["台帳の更新：", when(STOCK.updated)]);
+    var q = findInput.value.trim().toLowerCase(), shown = 0;
+    var forced = groupForced(), sig = curFilter + "|" + q;
+    if (sig !== TEMP_SIG) { TEMP_SIG = sig; TEMP_OPEN = {}; }
+    var pick = function (g) {
+      return (g.items || []).filter(function (it) {
+        if (curFilter !== "all" && it.state !== curFilter) return false;
+        return !q || (g.name + " " + it.label + " " + it.what + " " + it.where).toLowerCase().indexOf(q) !== -1;
+      }).sort(function (a, b) { return (ORDER[a.state] || 9) - (ORDER[b.state] || 9); });
+    };
+    var nGroups = STOCK.groups.filter(function (g) { return pick(g).length; }).length;
+    STOCK.groups.forEach(function (g) {
+      var items = pick(g);
+      if (!items.length) return;
+      var sec = el("details", "grp"), h = el("summary", "grp-h"), n = 0;
+      var saved = forced ? TEMP_OPEN[g.name] : GROUP_OPEN[g.name];
+      sec.open = saved != null ? !!saved : (forced || nGroups === 1);
+      sec.setAttribute("data-name", g.name);
+      var c = {}, rtN = 0, odN = 0;
+      items.forEach(function (it) {
+        if (curFilter !== "all" || it.state !== "売れた") n += it.count || 0;
+        c[it.state] = (c[it.state] || 0) + (it.count || 0);
+        var r0 = retakeFor(g, it);
+        if (r0 && !rtSent(r0)) rtN += 1;
+        var o0 = orderFor(g, it);
+        if (o0 && OPEN_STATES[o0.state]) odN += 1;
+      });
+      var tg = el("span", "grp-tg", sec.open ? "とじる ▲" : "ひらく ▼");
+      h.appendChild(segs(el("span", "grp-name"), g.name));   // 1行目＝作品名だけ（横幅を全部使う）
+      var row = el("span", "grp-row"), sub = el("span", "grp-sub");
+      sub.appendChild(el("span", "grp-n", (curFilter === "all" ? "手元 " : "") + n + "枚"));   // 「すべて」の時は売れた物を数えない＝手元の枚数と書く（売れた物だけの作品が「0枚」だけだと分かりにくい）
+      [["出品中", "出品中"], ["未出品", "まだ出していない"], ["売れた", "売れた"]].forEach(function (x) { if (c[x[0]]) sub.appendChild(el("span", "", x[1] + " " + c[x[0]])); });
+      if (rtN) sub.appendChild(el("span", "hot", "撮り直し " + rtN));
+      if (odN) sub.appendChild(el("span", "hot", "お願い中 " + odN));
+      row.appendChild(sub);
+      row.appendChild(tg);
+      h.appendChild(row);
+      sec.addEventListener("toggle", function () { tg.textContent = sec.open ? "とじる ▲" : "ひらく ▼"; });   // 文字だけ変える（覚えるのは押した時の click）
+      // 押した時だけ覚える（作り直しで開け閉めを入れた時は覚えない）。click の時点ではまだ切り替わっていない＝次の状態は !sec.open
+      h.addEventListener("click", function () {
+        var next = !sec.open;
+        if (groupForced()) TEMP_OPEN[g.name] = next; else { GROUP_OPEN[g.name] = next; saveGroupOpen(); }
+        setTimeout(updateAllBtn, 0);
+      });
+      sec.appendChild(h);
+      var ul = el("ul", "items");
+      items.forEach(function (it) {
+        var li = el("li", "item"), body = el("div", ""), meta = el("p", "meta");
+        li.setAttribute("data-state", it.state);
+        li.appendChild(el("span", "lab", it.label));
+        body.appendChild(segs(el("p", "what"), it.what));
+        var doneSale = it.state === "売れた" && it.sale && it.sale.done;   // 取引完了の印＝収支表で入金まで済んだ売上（2026-09-15）
+        var chip = el("span", "chip", doneSale ? "取引完了" : (CHIP[it.state] || it.state));
+        chip.setAttribute("data-state", doneSale ? "取引完了" : it.state);
+        meta.appendChild(chip);
+        if (it.state === "売れた" && it.sale) meta.appendChild(segs(el("span", "sale"), (it.sale.done ? "" : "入金待ち・") + (it.sale.raw ? "売値 " : "手取り ") + yen(it.sale.net) + (it.sale.raw ? "（手取りは未記入）" : "")));   // 手取りが空なら「売値」と書く
+        var bits = [];
+        if (it.price) bits.push(it.price);
+        if (it.where && it.state !== "未出品") bits.push(String(it.where).replace("✅", ""));
+        if (bits.length) meta.appendChild(segs(el("span", ""), bits.join("・")));
+        if (it.state !== "売れた" && refLine(it.ref)) meta.appendChild(segs(el("span", "ref"), refLine(it.ref)));   // 少ない数字・同じキャラの数字も分けて書いて出す（2026-09-15）
+        var od = orderFor(g, it);
+        if (od && fresh(od)) {
+          var os = el("span", "ostate", kindName(od.kind) + " " + yen(od.price) + "・" + od.state);
+          os.setAttribute("data-s", od.state);
+          meta.appendChild(os);
+        }
+        var rq = retakeFor(g, it);   // 写真の撮り直しのお願い（2026-09-15）
+        if (rq) meta.appendChild(el("span", "rt-badge", rtSent(rq) ? (rtSending(rq) ? "撮り直し 送っています" : "撮り直し 送りました") : "撮り直しのお願い"));
+        body.appendChild(meta);
+        li.appendChild(body);
+        var cnt = el("span", "cnt", String(it.count || 0));
+        cnt.appendChild(el("small", "", "枚"));
+        li.appendChild(cnt);
+        if (rq) {
+          var rb = el("button", "go rt-go", rtSent(rq) ? "もう一度撮り直す" : "写真を撮り直して送る");
+          rb.type = "button";
+          rb.addEventListener("click", function () { openRetake(rq); });
+          li.appendChild(rb);
+        }
+        // ★出品をやめる・売却済みにするのお願いが動いている間は、値段の画面ではなくそのお願いの画面を開く（2026-09-23）
+        var askOd = od && ASK_SHEET[od.kind] && OPEN_STATES[od.state] ? od : null;
+        if (!askOd && (it.state === "未出品" || it.state === "出品中")) {
+          var done = od && (OPEN_STATES[od.state] || (od.state === "出品済み" && it.state === "未出品"));
+          var go = el("button", done ? "go done" : "go", done ? (OPEN_STATES[od.state] ? "お願い済み（" + od.state + "）" : "出品済み（一覧の更新待ち）") : (it.state === "未出品" ? "値段を決めて出品をお願いする" : "値段を変える"));
+          go.type = "button";
+          go.addEventListener("click", function () { openSheet(g, it); });
+          li.appendChild(go);
+        }
+        if (askOd) {
+          var ao = el("button", "go done", kindName(askOd.kind) + "・お願い済み（" + askOd.state + "）");
+          ao.type = "button";
+          ao.addEventListener("click", function () { openAsk(askOd.kind, g, it); });
+          li.appendChild(ao);
+        } else if (!od || !OPEN_STATES[od.state]) {
+          // ★済んだ直後は、パソコンが在庫一覧を送り直すまで、この一覧が古いまま＝もう一度押せないようにする（出品の「一覧の更新待ち」と同じ）
+          var justDone = od && ASK_DONE[od.kind] === od.state ? od.kind : "";
+          if (canAsk("出品取消") && it.state === "出品中" && askChans(it).length && !askMissing(it).length) {
+            var waitC = justDone === "出品取消";
+            var cb = el("button", waitC ? "go done" : "go ask", waitC ? "出品をやめました（一覧の更新待ち）" : "この出品をやめる");
+            cb.type = "button";
+            cb.disabled = waitC;
+            if (!waitC) cb.addEventListener("click", function () { openAsk("出品取消", g, it); });
+            li.appendChild(cb);
+          }
+          if (canAsk("売却済み") && needPaid(it) && soldChans(it).length) {
+            var waitP = justDone === "売却済み";
+            var pb = el("button", waitP ? "go done" : "go paid", waitP ? "売却済みにしました（一覧の更新待ち）" : "お金が入った（売却済みに）");
+            pb.type = "button";
+            pb.disabled = waitP;
+            if (!waitP) pb.addEventListener("click", function () { openAsk("売却済み", g, it); });
+            li.appendChild(pb);
+          }
+        }
+        if (it.state === "出品中" && stopWays(it).length) {   // 売れたら ほかの出品を止める（2026-09-15）
+          var stop = el("button", "go stop", "売れたら ほかの出品を止める");
+          stop.type = "button";
+          stop.addEventListener("click", function () { openStop(g, it); });
+          li.appendChild(stop);
+        }
+        ul.appendChild(li);
+        shown += 1;
+      });
+      sec.appendChild(ul);
+      stockBox.appendChild(sec);
+    });
+    if (!shown) stockBox.appendChild(el("p", "empty", q ? "「" + findInput.value.trim() + "」に当てはまる物はありません" : "当てはまる物はありません"));
+    updateAllBtn();
+  }
+  byId("grp-all").addEventListener("click", function () {
+    var ds = [].slice.call(stockBox.querySelectorAll("details.grp"));
+    var openAll = ds.some(function (d) { return !d.open; }), forced = groupForced();
+    ds.forEach(function (d) {
+      d.open = openAll;
+      var nm = d.getAttribute("data-name");
+      if (forced) TEMP_OPEN[nm] = openAll; else GROUP_OPEN[nm] = openAll;
+    });
+    if (!forced) saveGroupOpen();
+    updateAllBtn();
+  });
+  // ---- 改良②（2026-09-13）：値段の画面（10円刻み）とスマホのお願い ----
+  // 本人の言葉＝「まだ出してないとかのところクリックできて出品申請できるようにして」「出品先は今出してるところ全て」
+  //   「スマホである程度俺の注文を入れておいてここを起動で流して欲しい」
+  // ★値段を決めるのは本人。参考金額は「メルカリで売れた値段の真ん中」を見せるだけ。
+  // ★お願いはGoogle側に置き、パソコンのClaudeが起動した時と動いている間に拾って流す（段階がここに戻る）
+  var ORDERS = null, ordersBusy = false, ordersFresh = false, ordersErr = null;
+  // お願いの一覧はスマホにも覚えておく＝開いた瞬間から「お願い済み」が分かる（読み終わるまでは、お願いのボタンは押せない）
+  var ORDERS_KEY = "zaikoSnap.orders.v1";
+  try { var ordersCached = JSON.parse(localStorage.getItem(ORDERS_KEY) || "null"); if (Array.isArray(ordersCached)) ORDERS = ordersCached; } catch (e) {}
+  function saveOrders() { try { localStorage.setItem(ORDERS_KEY, JSON.stringify((ORDERS || []).slice(-60))); } catch (e) {} }
+  var OLD_MSG = ["Google側の", "準備が", "まだです。", "パソコンで", "公開の仕上げが", "済むと", "使えます"];
+  var OPEN_STATES = { "受付": 1, "準備中": 1, "赤枠待ち": 1 };
+  // ★2026-09-22 本人「出品してまだ待ちの状態のときスマートフォン側でキャンセルボタン追加してくれない？」
+  //   前は受付の間だけ取り消せた＝パソコンが拾うとすぐ準備中になり、見た時にはボタンが無かった。
+  //   受け口の返事に cancelAny の印がある時だけ、準備中・赤枠待ちでも取り消せる（古い受け口に押すと断られるだけなので、印で見分ける）。
+  //   出品のお願いは、どこかの販路に出品IDが付いたら取り消せない＝もう公開されている（止めるのは「売れたら ほかの出品を止める」と同じ道）
+  var CANCEL_ANY = false;
+  function canCancel(o) {
+    if (!o || !OPEN_STATES[o.state]) return false;
+    if (o.state === "受付") return true;
+    if (!CANCEL_ANY) return false;
+    return o.kind === "値段変更" || !Object.keys(o.listings || {}).length;
+  }
+  // ---- 2026-09-23 本人指示：出品をやめる／お金が入った（売却済みにする）----
+  //   本人「在庫スナップで売れたけど相手から連絡なくて運営側からお金が入ったときに売却済みにするボタン追加」
+  //        「出品中の商品のキャンセルボタンも追加して」
+  //   ★受け口の返事の kinds に入っている時だけボタンを出す＝古い受け口は bad_kind で断る（黙って「出品」に化けない）
+  var ASK_KINDS = {};
+  function canAsk(k) { return ASK_KINDS[k] === true; }
+  var KIND_NAME = { "出品": "出品", "値段変更": "値段の変更", "出品取消": "出品をやめる", "売却済み": "売却済みにする" };
+  function kindName(k) { return KIND_NAME[k] || String(k || ""); }
+  var ASK_DONE = { "出品取消": "出品をやめた", "売却済み": "売却済みにした" };   // 種類ごとの「終わりの段階」（Code.gs の FINAL_OF と同じ言葉）
+  var ASK_SHEET = {
+    "出品取消": {
+      go: "出品をやめるよう お願いする",
+      lead: function (ch) { return ["いま出している", ch + "の出品を、", "パソコンが", "公開停止・", "下書きに戻します。"]; },
+      warn: ["削除はしません。", "あとで、", "また出せます。"],
+      cf: function (ch) { return [ch + "の出品を", "やめる"]; },
+      foot: ["止めるのは", "パソコンが", "やります", "（赤枠は", "ありません）。"]
+    },
+    "売却済み": {
+      go: "売却済みにするよう お願いする",
+      lead: function (ch) { return [ch + "から", "お金が入ったので、", "売却済みに", "します。"]; },
+      warn: ["パソコンが", "売上履歴で", "入金を確かめてから", "台帳と収支に", "書きます。"],
+      cf: function (ch) { return [ch + "で売れた分を", "売却済みにする"]; },
+      foot: ["相手の", "受取評価が", "なくても、", "運営から", "入金されていれば", "これでOKです。"]
+    }
+  };
+  var sheet = byId("sheet"), shGrp = byId("sh-grp"), shWhat = byId("sh-what"), shNow = byId("sh-now"), shRef = byId("sh-ref");
+  var shKind = byId("sh-kind"), shPrice = byId("sh-price"), shGauge = byId("sh-gauge"), shGl = byId("sh-gl"), shUseRef = byId("sh-useref");
+  var shChans = byId("sh-chans"), shMemo = byId("sh-memo"), shMsg = byId("sh-msg"), shGo = byId("sh-go"), shClose = byId("sh-close"), shCancel = byId("sh-cancel");
+  var shActs = byId("sh-acts"), shConfirm = byId("sh-confirm"), cfText = byId("cf-text"), cfGo = byId("cf-go"), cfBack = byId("cf-back");
+  var CF = null;   // 送る前の確認を出した時刻（出している間だけ）
+  var stopSheet = byId("stopsheet"), stGrp = byId("st-grp"), stWhat = byId("st-what"), stNow = byId("st-now"), stList = byId("st-list"), stClose = byId("st-close");
+  var ordersBox = byId("orders-box"), ordersList = byId("orders-list");
+  var SH = null;   // いま開いている品物 { g, it, order, uid }
+
+  function yen(n) { return "¥" + Math.round(Number(n) || 0).toLocaleString("ja-JP"); }
+  function digits(s) {
+    var t = String(s == null ? "" : s).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[,，]/g, "");
+    var m = t.match(/\d+/);
+    return m ? Number(m[0]) : 0;
+  }
+  function clampPrice(n) { n = Math.round((Number(n) || 0) / 10) * 10; return Math.max(300, Math.min(9999990, n)); }
+  function chansOf() { return (STOCK && STOCK.channels) || []; }
+  // 売れた例が5件以上で、混ざっていない時だけ「参考の値段」として使う（少ない件数の値段で値付けを誤らせない）
+  function usable(r) { return !!(r && r.中央値 && String(r.判定 || "").indexOf("OK") === 0); }
+  // ★値段を入れる画面では、数字があれば必ず出す（2026-09-15 本人「写真を送った際に中央値もしっかり表示…値段をこちらが入力するフェーズで」）。
+  //   その品物の数字が無い・少ない時は「同じキャラの1枚売り（絵柄やレア度は問わない）」の数字を、分けて書いて出す（その品物の値段と混ぜない）。
+  //   「参考の値段にする」ボタンと、最初に入る値段は、今までどおり usable（5件以上・混ざっていない）の時だけ
+  function nearOf(r) { return r && r.近い物 && r.近い物.中央値 ? r.近い物 : null; }
+  function nearWhy(n) { var j = String((n && n.判定) || ""); return j.indexOf("まだ混ざって") === 0 ? "（値段の幅が広い＝絵柄やレア度で大きく違う）" : j.indexOf("少ない") === 0 ? "（売れた例が少ない）" : ""; }
+  function refWhy(j) { j = String(j || ""); return j.indexOf("少ない") === 0 ? "売れた例が少ない（5件未満）ので、目安です" : j.indexOf("まだ混ざって") === 0 ? "別の絵柄が混ざっているかもしれません" : j; }
+  function refLine(r) {
+    if (r && r.中央値) return "参考 " + yen(r.中央値) + "（" + r.件数 + "件" + (usable(r) ? "" : String(r.判定 || "").indexOf("少ない") === 0 ? "・少なめ" : "・混ざりあり") + "）";
+    var n = nearOf(r);
+    return n ? "同じキャラ " + yen(n.中央値) + "（" + n.件数 + "件）" : "";
+  }
+  function refNums(x) {
+    var p = el("p", "ref-num");
+    p.appendChild(el("b", "", yen(x.中央値)));
+    p.appendChild(document.createTextNode("　" + x.件数 + "件・" + yen(x.最安) + "〜" + yen(x.最高)));
+    return p;
+  }
+  function takeHome(price, c) { return c.rate == null ? null : price - Math.floor(price * c.rate) - (c.ship || 0); }
+  function fresh(o) { return !!OPEN_STATES[o.state] || (o.state !== "取り消し" && Date.now() - (o.updated || 0) < 3 * 86400000); }
+  function orderFor(g, it) {
+    var hit = null;
+    (ORDERS || []).forEach(function (o) { if (o.group === g.name && o.label === it.label && o.state !== "取り消し") hit = o; });
+    return hit;
+  }
+  function openCount() { return ORDERS ? ORDERS.filter(function (o) { return OPEN_STATES[o.state]; }).length : null; }
+  function newUid() {
+    var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + "-" +
+      (Math.random().toString(36).replace(/[^a-z0-9]/g, "") + "000000").slice(1, 7);
+  }
+
+  function loadOrders() {
+    if (ordersBusy || !CFG) return;
+    ordersBusy = true;
+    api("orders", null, 15000, 2).then(function (j) {
+      ordersBusy = false;
+      ORDERS = j.orders || [];
+      CANCEL_ANY = j.cancelAny === true;
+      ASK_KINDS = {};
+      (j.kinds || []).forEach(function (k) { ASK_KINDS[k] = true; });
+      ordersFresh = true;
+      ordersErr = null;
+      saveOrders();
+      renderStock();
+      renderOrders();
+      if (SH) openSheet(SH.g, SH.it, true);   // 開いている値段の画面も、読めた一覧で出し直す
+    }, function (e) {
+      ordersBusy = false;
+      ordersErr = (e && e.code) || "network";
+      if (SH && !ordersFresh) openSheet(SH.g, SH.it, true);
+    });
+  }
+  function renderOrders() {
+    var list = (ORDERS || []).filter(fresh).slice(-10).reverse();
+    ordersBox.hidden = !list.length;
+    ordersList.textContent = "";
+    list.forEach(function (o) {
+      var li = el("li", ""), top = el("p", "o-top"), st = el("span", "ostate", o.state);
+      st.setAttribute("data-s", o.state);
+      top.appendChild(st);
+      top.appendChild(segs(el("span", ""), kindName(o.kind) + "　" + o.label + " " + o.what));
+      li.appendChild(top);
+      // ★前の道具はメモに「メルカリ・ラクマ・ヤフフリマに出品しました（¥600）」と書いていた＝隣の値段と販路が2回ずつ出た（2026-09-16 点検その3）
+      var chs = (o.channels || []).join("・"), note = String(o.note || ""), dup = !!note && !!chs && note.indexOf(chs) !== -1 && note.indexOf(yen(o.price).slice(1)) !== -1;
+      li.appendChild(segs(el("p", "o-note"), dup ? note : yen(o.price) + "・" + chs + (note ? "　" + note : "")));
+      if (canCancel(o)) {
+        var c = el("button", "o-cancel", "取り消す");
+        c.type = "button";
+        c.addEventListener("click", function () { cancelOrder(o, c); });
+        li.appendChild(c);
+      } else if (CANCEL_ANY && OPEN_STATES[o.state]) {
+        // ボタンが無い理由を書く（どこかの販路に出品IDが付いた出品のお願い＝もう公開されている）
+        li.appendChild(segs(el("p", "o-note"), "もう出品が始まっているので、ここでは取り消せません"));
+      }
+      ordersList.appendChild(li);
+    });
+    renderRedWait();
+  }
+  // ---- 赤枠待ちを、どのタブでも一番上に出す（2026-09-16 本人「1」＝席を外している間に、パソコンの赤枠が2回時間切れになった）----
+  // ★前に読んだ一覧（スマホに覚えている分）では出さない＝もう済んだ物で「押してほしい物があります」と出さない。読めた一覧だけで出す
+  var redwait = byId("redwait"), rwTitle = byId("rw-title"), rwList = byId("rw-list"), rwNote = byId("rw-note");
+  function redSince(o) {
+    var h = (o.history || []).filter(function (x) { return /→赤枠待ち/.test(String(x.what || "")); }).pop();
+    return (h && h.at) || o.updated || 0;
+  }
+  function renderRedWait() {
+    if (!redwait) return;   // 画面の部品を読む前に呼ばれた時
+    var list = ordersFresh ? (ORDERS || []).filter(function (o) { return o.state === "赤枠待ち"; }) : [];
+    redwait.hidden = !list.length;
+    if (!list.length) return;
+    var now = Date.now(), stale = false;
+    put(rwTitle, ["パソコンで", "押してほしい物が", list.length + "件", "あります"]);
+    rwList.textContent = "";
+    list.forEach(function (o) {
+      var min = Math.max(0, Math.round((now - redSince(o)) / 60000));
+      if (o.leaseUntil && o.leaseUntil < now) stale = true;
+      var what = String(o.what || "");
+      rwList.appendChild(segs(el("li", ""), kindName(o.kind) + "　" + o.label + " " + (what.length > 24 ? what.slice(0, 24) + "…" : what) + "　" + yen(o.price) + "（" + (min ? ago(min) + "から" : "たった今から") + "）"));
+    });
+    put(rwNote, stale ? ["30分以上", "たっている物が", "あります。", "パソコンに", "赤枠が", "出ていなければ、", "Claudeに", "声をかけてください"]
+      : ["パソコンの画面に", "赤枠が", "出ています。", "押すと、", "すぐ進みます"]);
+  }
+  byId("rw-go").addEventListener("click", function () {
+    showTab("home");
+    setTimeout(function () { var b = byId("orders-box"); if (!b.hidden) b.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
+  });
+  function cancelOrder(o, btn) {
+    btn.disabled = true;
+    function done(j) {
+      if (j.order) Object.keys(j.order).forEach(function (x) { o[x] = j.order[x]; }); else o.state = "取り消し";
+      saveOrders();
+      if (SH && SH.order && SH.order.uid === o.uid) closeSheet();
+      if (AK && AK.order && AK.order.uid === o.uid) closeAsk();
+      renderStock();
+      renderOrders();
+    }
+    api("cancelorder", { uid: o.uid }, 15000, 2).then(done, function (e) {
+      // ★返事が3秒来ないと同じ取り消しをもう1本送る（apiRace）。1本目で取り消せていると2本目は「too_late」で返る
+      //   ＝返ってきたお願いがもう「取り消し」なら成功（2026-09-16 点検その3＝取り消せたのに「取り消せません」と出ていた）
+      if (e && e.code === "too_late" && e.order && e.order.state === "取り消し") return done({ ok: true, order: e.order });
+      var late = e && e.code === "too_late", broken = e && e.code === "bad_store";
+      btn.textContent = late ? (CANCEL_ANY ? "もう出品や値段の変更が始まっていて取り消せません" : "もう準備が始まっていて取り消せません") : broken ? "お願いの記録が読めません（パソコンのClaudeに伝えてください）" : "取り消せませんでした（もう一度）";
+      btn.disabled = late || broken;
+      if (late) loadOrders();
+    });
+  }
+
+  var STORE_MSG = ["お願いの記録が", "読めなくなっています。", "送り直しても", "直らないので、", "パソコンのClaudeに", "伝えてください"];
+  function sheetMsg(kind, parts) {
+    if (!kind) { shMsg.hidden = true; return; }
+    shMsg.setAttribute("data-kind", kind);
+    put(shMsg, parts);
+    shMsg.hidden = false;
+  }
+  // ---- 売れたら ほかの出品を止める（2026-09-15 本人「売れたら…在庫スナップの方で取り消しボタンを追加して…俺が押したら当該の売ってるサイトの取り消しのページに遷移」）----
+  // ★このページはサイトを開くだけ。止めるボタンを押すのは本人（サイトの画面で）。止め方は削除ではなく「止める」＝あとで戻せる
+  // ★行き先はパソコンで確かめた道（2026-09-14 値段の変更13か所）：メルカリとYahoo!フリマは編集画面を直接開ける／ラクマは編集画面を直接開くと内部エラー＝出品一覧から入る
+  // ★Claudeが動いていないと「売れた」はこのページに届かない＝出品中の品物に、いつでも押せるボタンとして置く
+  var STOP_WAYS = {
+    "メルカリ": { re: /^m\d{11}$/, url: function (id) { return "https://jp.mercari.com/sell/edit/" + id; }, open: "編集画面を開く",
+      how: function () { return [["開いたら", ""], ["「出品を一時停止する」", "b"], ["を押す", ""], ["（隣の「この商品を削除する」は", "no"], ["押さない）", "no"]]; },
+      find: function (name) { return [["一覧で", ""], [name, "name"], ["を探して、", ""], ["編集画面で", ""], ["「出品を一時停止する」", "b"], ["を押す", ""], ["（隣の「この商品を削除する」は", "no"], ["押さない）", "no"]]; } },
+    "ラクマ": { re: /^[0-9a-f]{32}$/, url: function () { return listUrl("ラクマ"); }, open: "出品一覧を開く", item: function (id) { return "https://item.fril.jp/" + id; },
+      how: function (name) { return [["出品一覧の", ""], [name, "name"], ["の", ""], ["「編集」", "b"], ["→「下書きに保存する」", "b"], ["→「下書きに戻す」", "b"], ["まで押す", ""], ["（削除は押さない）", "no"]]; } },
+    "ヤフフリマ": { re: /^z\d{9}$/, url: function (id) { return "https://paypayfleamarket.yahoo.co.jp/item/" + id + "/edit"; }, open: "編集画面を開く",
+      how: function () { return [["開いたら", ""], ["「出品を停止する」", "b"], ["を押す", ""], ["（「商品を削除する」は押さない）", "no"]]; },
+      find: function (name) { return [["一覧で", ""], [name, "name"], ["を探して、", ""], ["編集画面で", ""], ["「出品を停止する」", "b"], ["を押す", ""], ["（「商品を削除する」は押さない）", "no"]]; } }
+  };
+  // 出品IDの記録が無い販路の行き先＝出品中の一覧。パソコンが販路台帳の「出品中」のアドレス（売れたかの点検と同じ所）を送る。届かない時（前の版の道具）だけ、ここの控えを使う
+  var STOP_LISTS = { "メルカリ": "https://jp.mercari.com/mypage/listings", "ラクマ": "https://fril.jp/sell", "ヤフフリマ": "https://paypayfleamarket.yahoo.co.jp/my/item/selling" };
+  function listUrl(name) {
+    var c = chansOf().filter(function (x) { return x.name === name; })[0], u = String((c && c.list) || "");
+    return /^https:\/\/[^\s"'<>]+$/.test(u) ? u : (STOP_LISTS[name] || "");
+  }
+  function findAny(name) { return [["一覧で", ""], [name, "name"], ["を探して、", ""], ["出品を止める", "b"], ["（削除は押さない）", "no"]]; }
+  function stopWays(it) {
+    var out = [], had = {};
+    (it.listings || []).forEach(function (m, k) {
+      Object.keys(STOP_WAYS).forEach(function (name) {
+        var id = String((m.ids || {})[name] || "");
+        if (STOP_WAYS[name].re.test(id)) { out.push({ n: k, name: name, id: id, what: m.what || it.what, price: m.price }); had[name] = true; }
+      });
+    });
+    // ★出品IDの記録が無い販路も抜かさない（2026-09-15 読み合わせ）＝黙って消えると「ここには出ていない」と読めて、二重に売れる。出品一覧を開いて品名で探してもらう
+    chansOf().forEach(function (c) {
+      if (!had[c.name]) out.push({ n: -1, name: c.name, id: "", what: it.what, price: digits(it.price) });
+    });
+    return out;
+  }
+  function chanLabel(name) {
+    var c = chansOf().filter(function (x) { return x.name === name; })[0];
+    return c && c.label ? c.label : (name === "ヤフフリマ" ? "Yahoo!フリマ" : name);
+  }
+  function openStop(g, it) {
+    var ways = stopWays(it), many = (it.listings || []).length > 1, last = -2, seen = [], none = [];
+    stGrp.textContent = "";
+    segs(stGrp, g.name);
+    stWhat.textContent = "";
+    segs(stWhat, it.label + "　" + it.what);
+    ways.forEach(function (w) { var l = chanLabel(w.name), to = w.id ? seen : none; if (to.indexOf(l) === -1) to.push(l); });
+    if (seen.length) put(stNow, ["出ている所：", seen.join("・")].concat(none.length ? ["（" + none.join("・") + "は", "出品IDの記録なし）"] : []));
+    else put(stNow, ["出品IDの記録が、", "どのサイトにも", "ありません"]);
+    stList.textContent = "";
+    ways.forEach(function (w) {
+      if (w.n !== last) {
+        var head = w.n >= 0 ? (many ? [(w.n + 1) + "つ目の出品"] : null) : (seen.length ? ["出品IDの記録が", "ない販路"] : null);
+        if (head) { var sub = el("li", "st-sub"); put(sub, head); stList.appendChild(sub); }
+        last = w.n;
+      }
+      var li = el("li", "st-ch"), way = STOP_WAYS[w.name] || {}, label = chanLabel(w.name);
+      var href = w.id ? way.url(encodeURIComponent(w.id)) : listUrl(w.name);
+      li.setAttribute("data-ch", w.name);
+      if (!w.id) li.setAttribute("data-norec", "1");
+      var nm = el("p", "st-name");
+      put(nm, [label]);
+      li.appendChild(nm);
+      if (href) {
+        var a = el("a", "st-open");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        put(a, [label + "の", w.id ? way.open : "出品一覧を開く"]);
+        li.appendChild(a);
+      }
+      var p = digits(w.price == null ? "" : w.price), name = "「" + w.what + "」" + (p ? "（" + yen(p) + "）" : "");
+      var parts = w.id ? way.how(name)
+        : href ? [["出品IDの記録がありません。", "rec"]].concat((way.find || way.how || findAny)(name))
+        : [["このページからは開けません。", "rec"], [label + "の", ""], ["サイトかアプリで、", ""], [name, "name"], ["を止める", "b"], ["（削除は押さない）", "no"]];
+      var how = el("p", "st-how");
+      parts.forEach(function (part) {
+        if (part[1] === "name") { var b = el("b", "st-nm"); segs(b, part[0]); how.appendChild(b); }
+        else how.appendChild(el(part[1] === "b" ? "b" : "span", part[1] === "no" ? "ph no" : (part[1] === "rec" ? "ph rec" : "ph"), part[0]));
+      });
+      li.appendChild(how);
+      if (w.id && way.item) {   // ラクマは一覧から探す＝どれか迷った時に、その品物のページ（写真と値段）を開けるようにする
+        var see = el("a", "st-item");
+        see.href = way.item(encodeURIComponent(w.id));
+        see.target = "_blank";
+        see.rel = "noopener noreferrer";
+        put(see, ["どれか迷ったら、", "品物のページで", "写真を見る"]);
+        li.appendChild(see);
+      }
+      stList.appendChild(li);
+    });
+    stopSheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    try { stWhat.focus({ preventScroll: true }); } catch (e) {}
+  }
+  // ---- 写真の撮り直し（2026-09-15 本人「あなたが修正が必要だと思ったものは写真修正依頼を在庫スナップで画像ごと掲載して、そこから進んで投稿した画像については、枚数を増やさず差し替え」）----
+  // ★パソコンが _撮り直し希望.json から送る一覧（STOCK.retakes・優先の高い順）。撮り直した写真は、メモの頭に「［差し替え ラベル=X］」を付けて、いつもの送り方で送る
+  // ★印の付いた写真は、パソコンが在庫を増やさずに差し替える（在庫写真を取る.py）。送ったことはこのスマホに覚えて「送りました」と出す（お願いが消えたら出さない）
+  var RT_KEY = "zaikoSnap.retakeSent.v1", RT = null;
+  function retakesOf() { return STOCK && Array.isArray(STOCK.retakes) ? STOCK.retakes : null; }
+  function rtKey(r) { return String(r.group || "") + "/" + String(r.label || ""); }
+  function rtSentAll() {
+    try { var o = JSON.parse(localStorage.getItem(RT_KEY) || "{}"); return o && typeof o === "object" && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
+  }
+  // ★「送りました」は写真が届いてから（2026-09-16 点検その3＝送る列に入れた瞬間に付き、読めない写真で送れなかった時も残った）
+  //   印＝{ t: 送った時刻, uids: 送った写真の受付番号 }。届く前は「送っています」／全部送れなかった（bad）ならお願いに戻す。前の版の印（時刻だけ）は「送りました」のまま
+  function rtT(v) { return typeof v === "number" ? v : Number((v && v.t) || 0); }
+  function rtSentInfo(r) {
+    var v = rtSentAll()[rtKey(r)], t = rtT(v);
+    if (!t || Date.now() - t >= 14 * 86400000) return null;
+    var uids = (v && v.uids) || [];
+    if (!uids.length) return { t: t, sending: false };
+    var hs = uids.map(histOf);
+    if (hs.every(function (h) { return h && h.state === "bad"; })) return null;
+    return { t: t, sending: !hs.some(function (h) { return !h || h.state === "届いた" || h.state === "在庫"; }) };   // 記録が消えた古い写真は届いた扱い
+  }
+  function rtSent(r) { var i = rtSentInfo(r); return i ? i.t : 0; }
+  function rtSending(r) { var i = rtSentInfo(r); return !!(i && i.sending); }
+  function rtMarkSent(r, uids) {
+    var o = rtSentAll(), live = {};
+    (retakesOf() || []).forEach(function (x) { live[rtKey(x)] = 1; });
+    Object.keys(o).forEach(function (k) { if (!live[k] || Date.now() - rtT(o[k]) > 14 * 86400000) delete o[k]; });   // もう無いお願い・古い印は捨てる
+    o[rtKey(r)] = { t: Date.now(), uids: uids || [] };
+    try { localStorage.setItem(RT_KEY, JSON.stringify(o)); } catch (e) {}
+  }
+  function retakeFor(g, it) {
+    var hit = null;
+    (retakesOf() || []).forEach(function (r) { if (r.group === g.name && r.label === it.label) hit = r; });
+    return hit;
+  }
+  function okThumb(u) { return /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(String(u || "")); }
+  function hm(t) { var d = new Date(t); return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function renderRetakes() {
+    var list = retakesOf(), box = byId("retake-box"), ul = byId("retake-list");
+    setN(byId("n-todo-retake"), list ? list.length : null, "件");
+    byId("todo-retake").setAttribute("data-hot", list && list.length ? "1" : "0");
+    ul.textContent = "";
+    box.hidden = !(list && list.length);
+    (list || []).forEach(function (r) {
+      var li = el("li", "rt-card"), sent = rtSent(r), body = el("div", "rt-body"), tags = [];
+      li.setAttribute("data-label", String(r.label || ""));
+      if (okThumb(r.thumb)) {
+        var im = el("img", "rt-thumb");
+        im.src = r.thumb;
+        im.alt = "いまの写真";
+        im.width = 88;
+        im.height = 88;
+        li.appendChild(im);
+      } else {
+        li.appendChild(el("span", "rt-thumb rt-nothumb", "写真なし"));
+      }
+      body.appendChild(segs(el("p", "rt-name"), r.label + "　" + (r.what || ""), 8));   // 縮小版の横の狭い欄＝長い塊は漢字とカタカナの境で分ける
+      if (r.priority) tags.push("優先 " + r.priority);
+      if (r.judge) tags.push("ピント：" + r.judge);
+      if (tags.length) body.appendChild(segs(el("p", "rt-tags"), tags.join("・")));
+      if (sent) put(body.appendChild(el("p", "rt-sent")), rtSending(r) ? ["送っています", "（" + hm(sent) + "）。", "届くまで", "少し待ってください"] : ["送りました", "（" + hm(sent) + "）。", "パソコンの取り込み待ち"]);   // 日付と時刻は1つの塊（行をまたがない）
+      li.appendChild(body);
+      if (r.reason) li.appendChild(glue(el("p", "rt-reason"), r.reason));   // 文なので名前用には区切らない（文節で折り返すのはCSS・ひらがなの続きだけ塊にする）
+      var b = el("button", "go rt-go", sent ? "もう一度撮り直す" : "撮り直して送る");
+      b.type = "button";
+      b.addEventListener("click", function () { openRetake(r); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+  function openRetake(r) {
+    RT = r;
+    var img = byId("rt-img"), why = byId("rt-why");
+    byId("rt-grp").textContent = "";
+    segs(byId("rt-grp"), r.group || "");
+    byId("rt-what").textContent = "";
+    segs(byId("rt-what"), r.label + "　" + (r.what || ""), 8);
+    if (okThumb(r.thumb)) { img.src = r.thumb; byId("rt-now").hidden = false; } else { img.removeAttribute("src"); byId("rt-now").hidden = true; }
+    why.textContent = "";
+    if (r.reason) glue(why, "理由：" + r.reason);
+    why.hidden = !r.reason;
+    byId("rt-msg").hidden = true;
+    byId("rtsheet").hidden = false;
+    document.body.classList.add("sheet-open");
+    try { byId("rt-what").focus({ preventScroll: true }); } catch (e) {}
+  }
+  function closeRetake() {
+    byId("rtsheet").hidden = true;
+    RT = null;
+    if (sheet.hidden && stopSheet.hidden && byId("cdsheet").hidden) document.body.classList.remove("sheet-open");
+  }
+  function sendRetake(input) {
+    var r = RT, picked = Array.prototype.slice.call(input.files || []).filter(function (f) { return f && f.size > 0; }).slice(0, 1);   // ★1枚だけ＝アルバムで何枚も選ぶと、別の品物の写真まで「差し替え」（数えない）になった（2026-09-16 点検その3）
+    input.value = "";
+    if (!r || !picked.length) return;
+    var memo = "［差し替え ラベル=" + r.label + "］" + String(r.what || "").slice(0, 60);   // パソコンの在庫写真を取る.py が読む印（形を変えたら向こうも直す）
+    var uid = makeUid();
+    enqueue(picked.map(function (f) { return { file: f, memo: memo, uid: uid }; }));
+    rtMarkSent(r, [uid]);
+    put(byId("rt-msg"), ["写真を送っています。", "届いたら", "「送りました」に", "変わります。", "在庫の数は増えません。"]);
+    byId("rt-msg").hidden = false;
+    renderRetakes();
+    if (STOCK) renderStock();
+  }
+  // ---- カードを1〜5枚で送る（2026-09-21 表と裏の2枚 → 2026-09-22 本人「5枚までにしましょうか　例えば　表　裏　スリーブ入り　特殊スリーブ入り　注意点の傷部分のアップ」
+  //   「1枚だけアップでもいいし3枚でもいいし…必ず5枚まで俺がやらないとだめってルールは無し」）----
+  //   1枚ずつ撮るたびに小さな絵が順に並ぶ（×で外せる）。「この◯枚で送る」を押した時に、まとめて送る（1枚から・5枚まで）。写真の種類は選ばせない（パソコン側で見て決める）
+  //   メモに「［カード N/M 組=<1枚目の受付番号>］」を付ける（N＝何枚目・M＝この組の枚数）
+  //   ＝パソコンの在庫写真を取る.py が読んで、同じ組は何枚でも1枚のカードと数える（数えるのは1枚目だけ）。★形を変えたら向こうも直す
+  //   （2026-09-21 の「［カード 表 組=X］」「［カード 裏 組=X］」はもう付けない。パソコン側は古い印も読める）
+  var CD = null, CD_MAX = 5;   // CD＝{ shots: [{ file, url }]（撮った順）, sent: 送ったか }
+  var cdMemo = byId("cd-memo");
+  function cdForget(s) { if (s && s.url) { try { URL.revokeObjectURL(s.url); } catch (e) {} s.url = ""; } }
+  function cdSlot(i, s, sent) {   // 小さな絵1つ（s が無ければ、次に撮る所の空き枠）
+    var li = el("li", "cd-shot" + (s ? "" : " cd-empty")), th = el("div", "cd-th"), lab = el("p", "cd-lab");
+    li.setAttribute("data-n", String(i + 1));
+    if (s) {
+      var im = document.createElement("img");
+      im.alt = (i + 1) + "枚目の写真";
+      if (s.url) im.src = s.url;
+      th.appendChild(im);
+      if (!sent) {
+        var x = el("button", "cd-x", "×");
+        x.type = "button";
+        x.setAttribute("aria-label", (i + 1) + "枚目を外す");
+        x.addEventListener("click", function () { cdRemove(i); });
+        th.appendChild(x);
+      }
+    } else {
+      th.appendChild(el("span", "cd-ph", "＋"));
+    }
+    li.appendChild(th);
+    put(lab, i === 0 ? ["1枚目", "（一覧の顔）"] : [(i + 1) + "枚目"]);
+    li.appendChild(lab);
+    return li;
+  }
+  function cdRender() {
+    var box = byId("cd-shots"), shots = CD ? CD.shots : [], n = shots.length, sent = !!(CD && CD.sent), g = byId("cd-guide"), go = byId("cd-send");
+    box.textContent = "";
+    shots.forEach(function (s, i) { box.appendChild(cdSlot(i, s, sent)); });
+    if (!sent && n < CD_MAX) box.appendChild(cdSlot(n, null, false));
+    byId("cd-side1").textContent = n ? "もう1枚" : "1枚目を";
+    byId("cd-side2").textContent = n ? "もう1枚" : "1枚目を";
+    byId("cd-picks").hidden = sent || n >= CD_MAX;   // 5枚になったら「もう1枚」は出さない
+    go.hidden = sent || !n;
+    go.disabled = sent || !n;
+    go.textContent = "この" + n + "枚で送る";
+    byId("cd-next").hidden = !sent;
+    byId("cd-close").textContent = n && !sent ? "やめる（送りません）" : "閉じる";
+    cdMemo.disabled = sent;
+    byId("cd-memo-row").hidden = sent;   // 送った後はメモ欄を隠す＝「送っています」の案内が下の帯に隠れない
+    g.hidden = sent;
+    if (!n) put(g, ["1枚目は、", "在庫の一覧に出る", "「顔」の写真です。", "表がおすすめです。"]);
+    else if (n === 1) put(g, ["この1枚だけでも", "送れます。", "足すなら、", "2枚目からは自由です", "（裏・スリーブ入り・", "傷のアップなど）。"]);
+    else if (n < CD_MAX) put(g, ["あと" + (CD_MAX - n) + "枚まで", "足せます", "（裏・スリーブ入り・", "傷のアップなど）。"]);
+    else put(g, ["5枚そろいました", "（5枚まで）。", "「この5枚で送る」を", "押してください。"]);
+  }
+  function cdSay(parts) { var msg = byId("cd-msg"); put(msg, parts); msg.hidden = false; }
+  function cdRemove(i) {
+    if (!CD || CD.sent || !CD.shots[i]) return;
+    cdForget(CD.shots.splice(i, 1)[0]);
+    cdRender();
+    cdSay([(i + 1) + "枚目を", "外しました。"].concat(i === 0 && CD.shots.length ? ["いまの1枚目が", "一覧の顔に", "なります。"] : []));
+  }
+  function openCard() {
+    if (CD) CD.shots.forEach(cdForget);
+    CD = { shots: [], sent: false };
+    cdMemo.value = memoInput.value;   // 送る画面のメモと同じもの（ここで書いても、送る画面で書いても、このカードの写真ぜんぶに付く）
+    cdRender();
+    byId("cd-msg").hidden = true;
+    byId("cdsheet").hidden = false;
+    document.body.classList.add("sheet-open");
+    try { byId("cd-title").focus({ preventScroll: true }); } catch (e) {}
+  }
+  function closeCard() {
+    byId("cdsheet").hidden = true;
+    if (CD) CD.shots.forEach(cdForget);
+    CD = null;
+    byId("cd-shots").textContent = "";
+    if (sheet.hidden && stopSheet.hidden && byId("rtsheet").hidden) document.body.classList.remove("sheet-open");
+  }
+  function cdUnsent() { return !!(CD && !CD.sent && CD.shots.length); }
+  function sameFile(a, b) { return !!(a && b) && a.name === b.name && a.size === b.size && a.lastModified === b.lastModified; }
+  function pickCard(input) {
+    var picked = Array.prototype.slice.call(input.files || []).filter(function (f) { return f && f.size > 0; }).slice(0, 1);   // 1枚だけ
+    input.value = "";
+    if (!CD || CD.sent || !picked.length) return;
+    var f = picked[0], n = CD.shots.length;
+    if (n >= CD_MAX) return cdSay(["5枚まで", "です。"]);
+    for (var j = 0; j < n; j++) {
+      if (sameFile(CD.shots[j].file, f)) return cdSay(["その写真は", "もう入っています", "（" + (j + 1) + "枚目）。", "別の写真を", "撮ってください。"]);
+    }
+    var url = "";
+    try { url = URL.createObjectURL(f); } catch (e) {}
+    CD.shots.push({ file: f, url: url });
+    cdRender();
+    cdSay([(n + 1) + "枚目を", "受け取りました。"]);
+  }
+  function sendCard() {
+    if (!CD || CD.sent || !CD.shots.length) return;
+    var shots = CD.shots, M = shots.length, uids = [], memo = cdMemo.value.trim(), m = memo ? memo + " " : "";
+    while (uids.length < M) { var u = makeUid(); if (uids.indexOf(u) === -1) uids.push(u); }
+    CD.sent = true;   // 先に立てる＝2度押しでも1回だけ送る
+    enqueue(shots.map(function (s, i) {
+      return { file: s.file, memo: m + "［カード " + (i + 1) + "/" + M + " 組=" + uids[0] + "］", uid: uids[i] };
+    }));
+    memoInput.value = "";   // メモはこのカードにだけ付ける
+    cdMemo.value = "";
+    cdRender();
+    cdSay([M + "枚を", "送っています。", "1枚のカードとして", "数えます。", "届いたかは", "「送った写真」で", "分かります。"]);
+  }
+  function closeStop() {
+    stopSheet.hidden = true;
+    if (sheet.hidden) document.body.classList.remove("sheet-open");
+  }
+  function closeSheet() {
+    CF = null;
+    shConfirm.hidden = true;
+    shActs.hidden = false;
+    sheet.hidden = true;
+    document.body.classList.remove("sheet-open");
+    SH = null;
+  }
+  // ---- 出品をやめる／お金が入った（売却済みにする）の画面（2026-09-23 本人指示）----
+  // ★値段は決めない＝台帳の値段をそのまま送る。押すのは「お願いする」の1回だけ（送る前に確認を出す）
+  var askSheet = byId("asksheet"), akGrp = byId("ak-grp"), akWhat = byId("ak-what"), akNow = byId("ak-now");
+  var akLead = byId("ak-lead"), akWarn = byId("ak-warn"), akMsg = byId("ak-msg"), akActs = byId("ak-acts");
+  var akGo = byId("ak-go"), akConfirm = byId("ak-confirm"), akCf = byId("ak-cf"), akCancel = byId("ak-cancel"), akFoot = byId("ak-foot");
+  var AK = null, AKCF = null;
+  function askChans(it) {
+    // 出品IDが分かっている販路だけ＝機械で止められる所。記録の無い販路は「売れたら ほかの出品を止める」から手で止める
+    var out = [];
+    (it.listings || []).forEach(function (m) {
+      Object.keys(STOP_WAYS).forEach(function (name) {
+        var id = String((m.ids || {})[name] || "");
+        if (STOP_WAYS[name].re.test(id) && out.indexOf(name) === -1) out.push(name);
+      });
+    });
+    return out;
+  }
+  // 🚨★台帳では「ここに出ている」と書いてあるのに、出品IDの記録が無い販路（2026-09-23）。
+  //   1つでもあると、やめても その販路は公開されたまま＝二重に売れる。だから「この出品をやめる」を出さない
+  //   （パソコンの道具も同じ理由で断る）。止めるのは「売れたら ほかの出品を止める」から手で
+  function askMissing(it) {
+    var have = askChans(it), w = String(it.where || "");
+    return chansOf().filter(function (c) { return w.indexOf(c.name) !== -1 && have.indexOf(c.name) === -1; }).map(function (c) { return c.name; });
+  }
+  function tradeOf(it) {
+    var hit = null;
+    ((STOCK && STOCK.trades) || []).forEach(function (t) { if (t && t.label === it.label) hit = t; });
+    return hit;
+  }
+  // ★売却済みにできる品＝「売れた」のに、まだ入金が確定していない（2026-09-23 本人指摘）。
+  //   前は「取引中」の一覧だけを見ていた＝代替くんのように、販路の側でとっくに取引が終わって
+  //   取引中から消えた品には、肝心のボタンが出なかった（それがまさに収支に入れたい品だった）
+  function needPaid(it) { return it.state === "売れた" && !(it.sale && it.sale.done); }
+  // 売れた販路＝取引中の記録があればそれ。無ければ「出ている所」に1つだけ出てくる販路名（決められない時は空）
+  function soldChans(it) {
+    var tr = tradeOf(it);
+    if (tr && tr.shop) return [tr.shop];
+    var w = String(it.where || "");
+    var hit = chansOf().filter(function (c) { return w.indexOf(c.name) !== -1; }).map(function (c) { return c.name; });
+    return hit.length === 1 ? hit : [];
+  }
+  function askMsg(kind, parts) {
+    if (!kind) { akMsg.hidden = true; return; }
+    akMsg.setAttribute("data-kind", kind);
+    put(akMsg, parts);
+    akMsg.hidden = false;
+  }
+  function askBack() { AKCF = null; akConfirm.hidden = true; akActs.hidden = false; }
+  function closeAsk() {
+    askBack();
+    askSheet.hidden = true;
+    if (sheet.hidden && stopSheet.hidden) document.body.classList.remove("sheet-open");
+    AK = null;
+  }
+  function openAsk(kind, g, it) {
+    var d = ASK_SHEET[kind];
+    if (!d) return;
+    var chans = kind === "出品取消" ? askChans(it) : soldChans(it);
+    var od = orderFor(g, it);
+    od = (od && od.kind === kind && OPEN_STATES[od.state]) ? od : null;
+    if (od) chans = od.channels || chans;
+    AK = { kind: kind, g: g, it: it, chans: chans, order: od, uid: null };
+    var ch = chans.map(chanLabel).join("・");
+    akGrp.textContent = "";
+    segs(akGrp, g.name);
+    akWhat.textContent = "";
+    segs(akWhat, it.label + "　" + it.what);
+    put(akNow, [it.price ? String(it.price) + "　" : "", ch].filter(function (x) { return x; }));
+    put(akLead, d.lead(ch));
+    put(akWarn, d.warn);
+    put(akFoot, ["お願いは、", "パソコンのClaudeが", "動いた時に", "流します。"].concat(d.foot));
+    akGo.textContent = d.go;
+    akGo.hidden = !!od;
+    akGo.disabled = !ordersFresh || !chans.length;
+    akCancel.hidden = !(od && canCancel(od));
+    akCancel.textContent = "このお願いを取り消す";
+    akCancel.disabled = false;
+    if (od) askMsg("ok", ["お願い済み（" + od.state + "）。", "パソコンが", "流します。"]);
+    else if (!ordersFresh) askMsg("bad", ["お願いの一覧を", "読んでいます。", "少し待ってから", "押してください"]);
+    else if (!chans.length) askMsg("bad", kind === "出品取消"
+      ? ["出品IDの記録が", "ありません。", "「売れたら", "ほかの出品を止める」から", "手で止めてください"]
+      : ["売れたサイトが", "分かりません。", "パソコンのClaudeに", "伝えてください"]);
+    else askMsg(null);
+    askSheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    akWhat.focus();
+  }
+  function askConfirm() {
+    if (!AK || AK.order || !ordersFresh || !AK.chans.length) return;
+    akCf.textContent = "";
+    ASK_SHEET[AK.kind].cf(AK.chans.map(chanLabel).join("・")).forEach(function (s) { akCf.appendChild(el("span", "ph", s)); });
+    AKCF = Date.now();
+    akActs.hidden = true;
+    akConfirm.hidden = false;
+    askMsg(null);
+  }
+  function sendAsk() {
+    if (!AK || AK.order || !ordersFresh || !AK.chans.length) return;
+    var me = AK, d = ASK_SHEET[me.kind];
+    me.uid = me.uid || newUid();   // 送れなかった時にもう一度押しても、同じ受付番号＝二重にならない
+    var order = { uid: me.uid, kind: me.kind, group: me.g.name, label: me.it.label, what: me.it.what,
+                  price: digits(me.it.price), was: String(me.it.price || ""), channels: me.chans, memo: "" };
+    akGo.disabled = true;
+    akGo.textContent = "送っています…";
+    askMsg(null);
+    api("order", { order: order }, 20000, 3).then(function (j) {
+      var got = j.order || order;
+      ORDERS = (ORDERS || []).filter(function (x) { return x.uid !== got.uid; }).concat([got]);
+      saveOrders();
+      renderStock();
+      renderOrders();
+      if (AK !== me) return;
+      me.order = got;
+      akGo.hidden = true;
+      akCancel.hidden = false;
+      askMsg("ok", ["お願いしました（受付）。", "パソコンのClaudeが", "動いた時に", "流します。"]);
+      setTimeout(function () { if (AK === me) closeAsk(); }, 1600);
+    }, function (e) {
+      if (AK !== me) return;
+      var c = e && e.code;
+      akGo.textContent = d.go;
+      akGo.disabled = false;
+      if (c === "already") {
+        akGo.disabled = true;
+        akGo.textContent = "もうお願い済みです";
+        askMsg("bad", ["この品物は、", "もうお願い済みです", "（別のスマホか、", "前に押した分）。"]);
+        ordersFresh = false;
+        loadOrders();
+        return;
+      }
+      // ★bad_kind＝Google側がまだ古い版（この種類を知らない）。黙って「出品」に化けずに断られている
+      if (c === "bad_kind" || c === "old_server") { akGo.disabled = true; askMsg("bad", OLD_MSG); return; }
+      if (c === "not_allowed") { akGo.disabled = true; askMsg("bad", reason("not_allowed")); return; }
+      if (c === "bad_store") { akGo.disabled = true; askMsg("bad", STORE_MSG); return; }
+      askMsg("bad", ["送れませんでした。", "電波の良い所で、", "もう一度", "押してください"]);
+    });
+  }
+  byId("ak-close").addEventListener("click", closeAsk);
+  byId("ak-back").addEventListener("click", askBack);
+  akGo.addEventListener("click", askConfirm);
+  byId("ak-cfgo").addEventListener("click", function () {
+    if (!AKCF || Date.now() - AKCF < 600) return;   // 続けて2回押した（ダブルタップ）だけでは送らない
+    askBack();
+    sendAsk();
+  });
+  akCancel.addEventListener("click", function () { if (AK && AK.order) cancelOrder(AK.order, akCancel); });
+  askSheet.addEventListener("click", function (e) { if (e.target === askSheet) closeAsk(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !askSheet.hidden) closeAsk(); });
+  function curPrice() { return clampPrice(digits(shPrice.value)); }
+  function updPrice() {
+    if (!SH) return;
+    var p = digits(shPrice.value), r = SH.it.ref, cs = chansOf();
+    [].forEach.call(shChans.querySelectorAll("li[data-i]"), function (li) {
+      var c = cs[Number(li.getAttribute("data-i"))], t = li.querySelector(".take"), cb = li.querySelector("input");
+      var v = takeHome(p, c);
+      t.textContent = v == null ? "手取りは未設定" : "手取り " + yen(v);
+      t.setAttribute("data-low", v != null && v < 100 ? "1" : "0");
+      li.style.opacity = cb.checked ? "1" : ".5";
+    });
+    var nr = nearOf(r), gr = r && r.中央値 && r.最高 > r.最安 ? r : (nr && !usable(r) && nr.最高 > nr.最安 ? nr : null);   // 目盛り＝その品物の数字（幅がある時）→ 無ければ同じキャラの1枚売り（2026-09-15）
+    if (gr) {
+      var lo = gr.最安, hi = gr.最高;
+      var pos = function (v) { return Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)); };
+      shGauge.hidden = false;
+      shGl.hidden = false;
+      shGauge.querySelector(".g-med").style.left = pos(gr.中央値) + "%";
+      shGauge.querySelector(".g-me").style.left = pos(p) + "%";
+      put(shGl, ["安い " + yen(lo), "真ん中 " + yen(gr.中央値), "高い " + yen(hi)]);
+    } else {
+      shGauge.hidden = true;
+      shGl.hidden = true;
+    }
+    if (!SH.order) shGo.disabled = !shChans.querySelector("input:checked") || p < 300 || !ordersFresh || !!SH.locked;
+  }
+  function openSheet(g, it, keep) {
+    var wasCf = !!CF;   // 確認を出している間に一覧を読み直した時は、出し直す（2026-09-16）
+    CF = null;
+    shConfirm.hidden = true;
+    shActs.hidden = false;
+    var o = orderFor(g, it);
+    // keep＝開いたまま出し直す（お願いの一覧が読めた時など）。打ちかけの値段・出品先・ひとことは残す
+    var prev = keep && SH ? { uid: SH.uid, locked: SH.locked, already: SH.already, price: shPrice.value, memo: shMemo.value,
+      chans: [].map.call(shChans.querySelectorAll("input:checked"), function (x) { return x.value; }) } : null;
+    var shown = o && (OPEN_STATES[o.state] || (o.state === "出品済み" && it.state === "未出品"));
+    SH = { g: g, it: it, order: shown ? o : null, uid: prev ? prev.uid : null, locked: prev ? prev.locked : false, already: prev ? prev.already : false };
+    var listed = it.state === "出品中", r = it.ref || null, busy = !!SH.order;
+    // ★値段の変更の画面なのに「最後の『出品する』は…」と出ていた（2026-09-16 点検その3）＝出品と値段の変更で分ける
+    put(byId("sh-foot"), ["お願いは、", "パソコンのClaudeが", "動いた時に", "流します。", "最後の", listed ? "「変更する」は、" : "「出品する」は、", "いまは", "パソコンの", "赤枠で", "押します。"]);
+    put(shGrp, [g.name]);
+    shWhat.textContent = "";
+    segs(shWhat, it.label + "　" + it.what);
+    put(shNow, listed ? ["いまの値段：", it.price || "–", "（" + String(it.where || "").replace(/[✅*]/g, "") + "）"] : ["手元に" + (it.count || 0) + "枚", "・まだ出していない"]);
+    shRef.textContent = "";
+    var near = nearOf(r), has = !!(r && r.中央値);
+    if (has) {
+      shRef.appendChild(segs(el("p", ""), "参考（メルカリで売れた値段の真ん中）"));
+      shRef.appendChild(refNums(r));
+      shRef.appendChild(segs(el("p", "small"), (usable(r) ? (r.判定 !== "OK" ? "※" + r.判定 + "　" : "") : "※" + refWhy(r.判定) + "　") + "調べた日：" + when(r.調べた)));
+    }
+    if (near && !usable(r)) {
+      if (has) shRef.appendChild(el("hr", "ref-sep"));
+      shRef.appendChild(segs(el("p", ""), (has ? "" : "この品物だけの売れた例は見つからないので、") + "同じキャラの1枚売り（絵柄やレア度は問わない）"));
+      shRef.appendChild(refNums(near));
+      shRef.appendChild(segs(el("p", "small"), "※この品物の値段ではなく、目安です" + nearWhy(near) + (has ? "" : "　調べた日：" + when(r.調べた))));
+    }
+    if (!has && !near) {
+      shRef.appendChild(segs(el("p", ""), !r ? "参考金額は、まだ調べていません（次に在庫を送る時に、パソコンが調べます）"
+        : r.調べ方なし ? (listed ? (r.まとめ ? "まとめて出している品物なので、1枚の参考金額は出していません" : "名前からは、参考金額を調べられませんでした") : "品物がまだ特定できていないので、参考金額を調べていません（パソコンのClaudeが品物を特定します）")   // ★出品中の品物も調べ方を自動で作る（2026-09-17 本人「4」）＝ここに来るのは、作品の決まりやキャラの名前が無くて作れなかった物
+        : r.読めなかった ? "参考金額は、調べた時に読めませんでした（次に在庫を送る時に、調べ直します）"
+        : "1枚売りで売れた例が、見つかりませんでした"));
+    }
+    shUseRef.hidden = !usable(r);
+    var start = busy ? SH.order.price : (prev ? (digits(prev.price) || 300) : (listed && digits(it.price) ? digits(it.price) : (usable(r) ? r.中央値 : 300)));
+    shPrice.value = String(clampPrice(start));
+    shKind.textContent = listed ? "新しい値段" : "出品する値段";
+    shGo.textContent = listed ? "値段の変更をお願いする" : "出品をお願いする";
+    shChans.textContent = "";
+    var where = String(it.where || "");
+    chansOf().forEach(function (c, i) {
+      var li = el("li", ""), lab = el("label", ""), cb = document.createElement("input");
+      li.setAttribute("data-i", String(i));
+      cb.type = "checkbox";
+      cb.value = c.name;
+      cb.checked = busy ? (SH.order.channels || []).indexOf(c.name) !== -1 : (prev ? prev.chans.indexOf(c.name) !== -1 : (!listed || where.indexOf(c.name) !== -1 || where.indexOf(c.label) !== -1));
+      cb.addEventListener("change", updPrice);
+      lab.appendChild(cb);
+      lab.appendChild(el("span", "", c.label));
+      lab.appendChild(el("span", "take", ""));
+      li.appendChild(lab);
+      shChans.appendChild(li);
+    });
+    if (!chansOf().length) shChans.appendChild(el("li", "", "出品先の一覧が、まだ届いていません"));
+    shMemo.value = busy ? (SH.order.memo || "") : (prev ? prev.memo : "");
+    shGo.hidden = busy;
+    shGo.disabled = false;
+    shCancel.hidden = !(busy && canCancel(SH.order));
+    shCancel.disabled = false;
+    shCancel.textContent = "このお願いを取り消す";
+    [shPrice, shMemo, shUseRef].concat([].slice.call(shChans.querySelectorAll("input")), [].slice.call(sheet.querySelectorAll(".steps button"))).forEach(function (x) { x.disabled = busy; });
+    if (!keep && !ordersFresh) ordersErr = null;   // 開くたびに読み直す（前に読めなかった知らせは消す）
+    if (busy && SH.already) sheetMsg("bad", ["この品物は、", "もうお願い済みでした", "（別のスマホか、前に押した分）。", "お願い中です（" + SH.order.state + "・" + yen(SH.order.price) + "）。"]);
+    else if (busy) sheetMsg("ok", SH.order.state === "出品済み" ? ["出品済みです", "（在庫の一覧の", "更新待ち）。"] : ["お願い中です（" + SH.order.state + "）。", SH.order.note || "パソコンのClaudeが動いた時に流します。"]);
+    else if (SH.locked) { /* 押した後に断られた＝その知らせを残す */ }
+    else if (!ordersFresh && ordersErr === "old_server") sheetMsg("bad", OLD_MSG);
+    else if (!ordersFresh && ordersErr) sheetMsg("bad", ["お願いの状況が", "読めませんでした。", "電波の良い所で", "開き直してください"]);
+    else sheetMsg(null);
+    updPrice();
+    // お願いの一覧を読み終わるまでは押せない（開き直した直後や別のスマホで、同じ品物に二重にお願いしないため）
+    if (!busy && !ordersFresh && !ordersErr) shGo.textContent = "お願いの状況を確かめています…";
+    if (!busy && !ordersFresh && !keep) loadOrders();
+    sheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    if (!keep) {
+      sheet.querySelector(".sheet").scrollTop = 0;
+      shWhat.focus({ preventScroll: true });
+    }
+    if (keep && wasCf && !SH.order && !SH.locked && ordersFresh) showConfirm();
+  }
+  function bump(d) { shPrice.value = String(clampPrice(curPrice() + d)); updPrice(); }
+  [].forEach.call(sheet.querySelectorAll(".steps button"), function (b) {
+    var d = Number(b.getAttribute("data-d")), timer = null, rep = null, held = false;
+    function stop() { if (timer) clearTimeout(timer); if (rep) clearInterval(rep); timer = null; rep = null; }
+    // 1回押しは、指を離した時（click）に1刻み。押しっぱなしは0.45秒たってから動き続ける（投資の道具のように）
+    // ★指が触れた瞬間には動かさない（2026-09-16 点検その3＝スクロールしようとして＋−に指が乗っただけで値段が変わっていた。
+    //   スクロールになった時はブラウザが pointercancel を出す＝click は来ない・押しっぱなしの待ちも止まる）
+    b.addEventListener("pointerdown", function () {
+      if (b.disabled) return;
+      held = false;
+      stop();
+      timer = setTimeout(function () { held = true; bump(d); rep = setInterval(function () { bump(d); }, 90); }, 450);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { b.addEventListener(t, stop); });
+    b.addEventListener("click", function () { if (held) { held = false; return; } bump(d); });
+    b.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  });
+  // ---- 送る前の確認（2026-09-16 点検その3）＝値段はパソコンでお願いの数字のまま出品される。押し間違いをここで止める ----
+  function sheetInputs() { return [shPrice, shMemo, shUseRef].concat([].slice.call(shChans.querySelectorAll("input")), [].slice.call(sheet.querySelectorAll(".steps button"))); }
+  function hideConfirm() {
+    if (!CF) return;
+    CF = null;
+    shConfirm.hidden = true;
+    shActs.hidden = false;
+    if (SH && !SH.order) sheetInputs().forEach(function (x) { x.disabled = false; });
+    updPrice();
+  }
+  function showConfirm() {
+    if (!SH || SH.order || !ordersFresh || SH.locked) return;
+    var listed = SH.it.state === "出品中", p = curPrice();
+    var chans = [].map.call(shChans.querySelectorAll("input:checked"), function (x) { return x.value; });
+    shPrice.value = String(p);
+    updPrice();
+    if (!chans.length) return sheetMsg("bad", ["出品先を", "1つ以上", "選んでください"]);
+    var labels = chansOf().filter(function (c) { return chans.indexOf(c.name) !== -1; }).map(function (c) { return c.label; });
+    cfText.textContent = "";
+    if (listed) {
+      cfText.appendChild(el("span", "ph", "値段を" + yen(digits(SH.it.price)) + "から"));
+      cfText.appendChild(el("span", "ph cf-big", yen(p)));
+      cfText.appendChild(el("span", "ph", "に変えるお願い"));
+    } else {
+      cfText.appendChild(el("span", "ph cf-big", yen(p)));
+      cfText.appendChild(el("span", "ph", "で出品をお願い"));
+    }
+    var line2 = el("span", "cf-chans");
+    put(line2, ["出品先：", labels.join("・")]);
+    cfText.appendChild(line2);
+    CF = Date.now();
+    sheetInputs().forEach(function (x) { x.disabled = true; });
+    shActs.hidden = true;
+    shConfirm.hidden = false;
+    sheetMsg(null);
+  }
+  shGo.addEventListener("click", showConfirm);
+  cfBack.addEventListener("click", hideConfirm);
+  cfGo.addEventListener("click", function () {
+    if (!CF || Date.now() - CF < 600) return;   // 続けて2回押した（ダブルタップ）だけでは送らない
+    hideConfirm();
+    sendOrder();
+  });
+  shPrice.addEventListener("input", function () {
+    var v = String(shPrice.value).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[^\d]/g, "").slice(0, 7);
+    if (v !== shPrice.value) shPrice.value = v;
+    updPrice();
+  });
+  shPrice.addEventListener("blur", function () { shPrice.value = String(clampPrice(digits(shPrice.value) || 300)); updPrice(); });
+  shUseRef.addEventListener("click", function () { if (SH && usable(SH.it.ref)) { shPrice.value = String(clampPrice(SH.it.ref.中央値)); updPrice(); } });
+  shClose.addEventListener("click", closeSheet);
+  sheet.addEventListener("click", function (e) { if (e.target === sheet) closeSheet(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !sheet.hidden) closeSheet(); });
+  stClose.addEventListener("click", closeStop);
+  stopSheet.addEventListener("click", function (e) { if (e.target === stopSheet) closeStop(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !stopSheet.hidden) closeStop(); });
+  byId("rt-close").addEventListener("click", closeRetake);
+  byId("rtsheet").addEventListener("click", function (e) { if (e.target === byId("rtsheet")) closeRetake(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !byId("rtsheet").hidden) closeRetake(); });
+  byId("rt-cam").addEventListener("change", function () { sendRetake(byId("rt-cam")); });
+  byId("rt-album").addEventListener("change", function () { sendRetake(byId("rt-album")); });
+  byId("card-pick").addEventListener("click", openCard);
+  byId("home-card").addEventListener("click", function () { showTab("send"); openCard(); });
+  byId("cd-close").addEventListener("click", closeCard);
+  byId("cd-next").addEventListener("click", openCard);
+  byId("cd-send").addEventListener("click", sendCard);
+  cdMemo.addEventListener("input", function () { if (CD && !CD.sent) memoInput.value = cdMemo.value; });   // メモは1つ（送る画面のメモ欄と同じ中身）
+  byId("cdsheet").addEventListener("click", function (e) { if (e.target === byId("cdsheet") && !cdUnsent()) closeCard(); });   // まだ送っていない写真がある時は、外側に触れただけでは閉じない（「やめる」で閉じる）
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !byId("cdsheet").hidden) closeCard(); });
+  byId("cd-cam").addEventListener("change", function () { pickCard(byId("cd-cam")); });
+  byId("cd-album").addEventListener("change", function () { pickCard(byId("cd-album")); });
+  byId("todo-retake").addEventListener("click", function () { var box = byId("retake-box"); if (!box.hidden) box.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  shCancel.addEventListener("click", function () { if (SH && SH.order) cancelOrder(SH.order, shCancel); });
+  function sendOrder() {
+    if (!SH || SH.order || !ordersFresh || SH.locked) return;
+    var me = SH, listed = me.it.state === "出品中", p = curPrice();
+    var chans = [].map.call(shChans.querySelectorAll("input:checked"), function (x) { return x.value; });
+    shPrice.value = String(p);
+    if (!chans.length) return sheetMsg("bad", ["出品先を", "1つ以上", "選んでください"]);
+    me.uid = me.uid || newUid();   // 送れなかった時にもう一度押しても、同じ受付番号＝二重にならない
+    var order = { uid: me.uid, kind: listed ? "値段変更" : "出品", group: me.g.name, label: me.it.label, what: me.it.what,
+                  price: p, was: listed ? String(me.it.price || "") : "", channels: chans, memo: shMemo.value.trim().slice(0, 100) };
+    shGo.disabled = true;
+    shGo.textContent = "送っています…";
+    sheetMsg(null);
+    api("order", { order: order }, 20000, 3).then(function (j) {
+      var got = j.order || order;
+      ORDERS = (ORDERS || []).filter(function (x) { return x.uid !== got.uid; }).concat([got]);
+      saveOrders();
+      renderStock();
+      renderOrders();
+      if (SH !== me) return;
+      me.order = got;
+      shGo.hidden = true;
+      shCancel.hidden = false;
+      sheetMsg("ok", ["お願いしました（受付）。", "パソコンのClaudeが", "動いた時に", "流します。"]);
+      setTimeout(function () { if (SH === me) closeSheet(); }, 1600);
+    }, function (e) {
+      if (SH !== me) return;
+      var c = e && e.code;
+      shGo.textContent = listed ? "値段の変更をお願いする" : "出品をお願いする";
+      if (c === "already") {
+        // 別のスマホか、前に押した分で、もうお願い済み＝押せないままにして、お願いの様子に切り替える
+        me.locked = true;
+        me.already = true;   // 切り替わった後も「もうお願い済みでした」と出す（自分のお願いが通ったと勘違いしない）
+        shGo.disabled = true;
+        shGo.textContent = "もうお願い済みです";
+        sheetMsg("bad", ["この品物は、", "もうお願い済みです", "（別のスマホか、前に押した分）。"]);
+        ordersFresh = false;
+        loadOrders();
+        return;
+      }
+      if (c === "old_server" || c === "not_allowed") {
+        me.locked = true;
+        shGo.disabled = true;
+        sheetMsg("bad", c === "not_allowed" ? reason("not_allowed") : OLD_MSG);
+        return;
+      }
+      shGo.disabled = false;   // 電波などで届かなかった時だけ、もう一度押せる（同じ受付番号＝二重にならない）
+      if (c === "bad_store") { shGo.disabled = true; sheetMsg("bad", STORE_MSG); return; }   // ★送り直しても直らない＝電波のせいにしない（2026-09-16 点検その3の12）
+      sheetMsg("bad", c === "bad_price" ? ["値段が", "受け付けられませんでした"] : ["送れませんでした。", "電波の良い所で、", "もう一度", "押してください"]);
+    });
+  }
+
+  tabHome.addEventListener("click", function () { showTab("home"); });
+  tabSend.addEventListener("click", function () { showTab("send"); });
+  tabStock.addEventListener("click", function () { showTab("stock"); });
+  filterEl.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("button[data-f]") : null;
+    if (!b) return;
+    curFilter = b.getAttribute("data-f");
+    Array.prototype.forEach.call(filterEl.querySelectorAll("button[data-f]"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+    renderStock();
+  });
+  findInput.addEventListener("input", renderStock);
+
+  if (!CFG) {
+    gate.hidden = false;
+    drop.hidden = true;
+    bar.hidden = true;
+    paneSend.hidden = true;
+    paneHome.hidden = true;
+    pcEl.hidden = true;
+    setStatus("bad", ["リンクから", "開いてください"]);
+    return;
+  }
+  tabsEl.hidden = false;
+  setStatus("ok", ["写真を", "送れます"]);
+  renderShots();
+  refresh();
+  showTab("send");
+  loadOrders();   // 赤枠待ちを最初の画面（写真を送る）でも出すため、開いたらお願いの一覧も読む（2026-09-16）
+  // 前に送れていなかった写真（スマホの中に残してある分）を、続きから送る
+  kept().then(function (rows) {
+    if (!rows || !rows.length) return;
+    rows.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+    enqueue(rows.map(function (r) { return { file: r.blob, memo: r.memo, uid: r.uid, name: r.name, size: r.size, lm: r.lm, at: r.at, resumed: true }; }).filter(function (it) {
+      // 前に「確かめ中」「届いていません」だった写真は、すぐには送り直さず、行方を聞いて確かめる（2026-09-15）
+      var h = histOf(it.uid);
+      if (!h || (h.state !== "確かめ中" && h.state !== "届かず")) return true;
+      if (h.state === "届かず") it.lost = true;
+      checking[it.uid] = it;
+      return false;
+    }));
+    if (lostN() && !running && !queue.length) retryBtn.hidden = false;
+    showQueue();
+    track();
+  });
+  // ページを見ている間は1分おきに、数・パソコンのClaudeの様子・写真の行方を聞き直す
+  // ★お願いの一覧は、どのタブでも読む（赤枠待ちを一番上に出すため・2026-09-16）
+  setInterval(function () { if (document.visibilityState === "visible") { refresh(); track(); loadOrders(); } }, 60000);
+})();
+</script>
+</body>
+</html>
