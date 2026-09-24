@@ -754,6 +754,10 @@
   "use strict";
 
   var STORE = "zaikoSnap.v1";
+  // ★古いリンク対策（2026-09-24 本人「端末で一度切りだったと思うけど毎回要求されてだるい」）＝合言葉を作り直す前に作ったホーム画面のアイコン・ブックマークは、
+  //   # の後ろに古い合言葉を持ったまま＝開くたびに覚えている合言葉を上書き→断られる→言葉の画面、を毎回くり返していた。
+  var BAD_STORE = STORE + ".bad";     // 受け口に断られた合言葉（次からリンクに付いていても使わない）
+  var PREV_STORE = STORE + ".prev";   // リンクで上書きする前に覚えていた合言葉（リンクの方が断られたら、言葉を聞かずにこちらへ戻す）
   var MAX_EDGE = 2400;   // 長い辺をこれ以下に縮める（型番が読める大きさ。3200だと重くて送り直しが多かった＝2026-09-13）
   var QUALITY = 0.85;
   var PARALLEL = 1;      // 1枚ずつ送る（受け口は1枚ずつしか受け取れないので、同時に送ると待ち時間が伸びる）
@@ -791,13 +795,22 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
 
   // リンクの「#」より後ろ（サーバーには届かない所）から、送り先と合言葉を読む。
   // 次にリンク無しで開いた時のために、この端末にも覚えておく。
+  function badKeys() {
+    try { var a = JSON.parse(localStorage.getItem(BAD_STORE) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
   function readConfig() {
     var h = String(location.hash || "").replace(/^#/, "");
     if (h) {
       var q = new URLSearchParams(h);
       var d = q.get("d") || "", k = q.get("k") || "";
-      if (ID_RE.test(d) && KEY_RE.test(k)) {
-        try { localStorage.setItem(STORE, JSON.stringify({ d: d, k: k })); } catch (e) {}
+      if (ID_RE.test(d) && KEY_RE.test(k) && badKeys().indexOf(k) === -1) {   // 一度断られた合言葉のリンクは無視して、覚えている方を使う
+        try {
+          var cur = JSON.parse(localStorage.getItem(STORE) || "null");
+          // 控えるのは通ったことのある合言葉だけ（ok:false＝リンクで入れてまだ通っていない物は控えない＝古いリンクを続けて開いても良い控えを消さない・別の目 2026-09-24）
+          //   ok の印が無い物（この直しの前に覚えた物）は通っていた物として扱う
+          if (cur && ID_RE.test(cur.d) && KEY_RE.test(cur.k) && cur.k !== k && cur.ok !== false) localStorage.setItem(PREV_STORE, JSON.stringify({ d: cur.d, k: cur.k }));
+          localStorage.setItem(STORE, JSON.stringify({ d: d, k: k, ok: false }));
+        } catch (e) {}
         return { d: d, k: k };
       }
     }
@@ -811,6 +824,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var EXEC = CFG ? "https://script.google.com/macros/s/" + CFG.d + "/exec" : "";
 
   // 送り直しても答えが変わらない返事（合言葉違い・大きすぎる・取り消しの時間切れ・値段や出品先の不備）は、送り直さずにそのまま伝える
+  var prevCleared = false;
   var HARD = ["not_allowed", "too_large", "too_late", "bad_price", "no_channel", "bad_order", "no_order", "old_server", "already", "bad_store"];
   // Googleのログイン状態に左右されないよう、Cookieを付けずに送る
   function apiOnce(op, extra, ms, sendOnly) {
@@ -840,6 +854,14 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
           if (j.order) er.order = j.order;   // 断られた時のお願いの今の姿（取り消しが2本目で断られても、1本目で取り消せていたかが分かる・2026-09-16）
           throw er;
         }
+        if (!prevCleared) {   // いまの合言葉が通った＝控えは要らない・覚えている合言葉に「通った」の印を付ける
+          prevCleared = true;
+          try {
+            localStorage.removeItem(PREV_STORE);
+            var sv = JSON.parse(localStorage.getItem(STORE) || "null");
+            if (sv && sv.k === CFG.k && sv.ok === false) localStorage.setItem(STORE, JSON.stringify({ d: sv.d, k: sv.k }));
+          } catch (e) {}
+        }
         return j;
       });
     }, function () {
@@ -855,6 +877,19 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   function relock() {
     if (relocking) return;
     relocking = true;
+    var prev = null;
+    try {
+      var bad = badKeys().filter(function (x) { return x !== CFG.k; });
+      bad.push(CFG.k);
+      localStorage.setItem(BAD_STORE, JSON.stringify(bad.slice(-10)));   // 断られた合言葉を覚える＝同じアイコンから開き直しても、もう使わない
+      prev = JSON.parse(localStorage.getItem(PREV_STORE) || "null");
+      localStorage.removeItem(PREV_STORE);
+    } catch (e) {}
+    if (prev && ID_RE.test(prev.d) && KEY_RE.test(prev.k) && prev.k !== CFG.k && badKeys().indexOf(prev.k) === -1) {
+      try { localStorage.setItem(STORE, JSON.stringify({ d: prev.d, k: prev.k })); } catch (e) {}
+      location.replace(location.pathname);   // リンクで上書きする前の合言葉で開き直す（言葉は聞かない）
+      return;
+    }
     try { localStorage.removeItem(STORE); } catch (e) {}
     location.replace(location.pathname + "?relock=1");   // # の後ろ（古いリンクの合言葉）も外して開き直す
   }
@@ -903,7 +938,11 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
         n += 1;
         unlockOnce(p).then(function (j) {
           if (j.ok && KEY_RE.test(String(j.k || ""))) {
-            try { localStorage.setItem(STORE, JSON.stringify({ d: HOME_D, k: j.k })); } catch (e) {}
+            try {
+              localStorage.setItem(STORE, JSON.stringify({ d: HOME_D, k: j.k }));
+              var bk = badKeys(), bi = bk.indexOf(j.k);   // 受け口が「今の合言葉」と渡した物は「使わない」から外す（受け口の置き直しで差し込みを忘れ、正しい合言葉まで断られた時の戻り道・2026-09-24）
+              if (bi !== -1) { bk.splice(bi, 1); localStorage.setItem(BAD_STORE, JSON.stringify(bk)); }
+            } catch (e) {}
             pass.value = "";
             CFG = { d: HOME_D, k: j.k };
             EXEC = "https://script.google.com/macros/s/" + CFG.d + "/exec";
