@@ -302,6 +302,8 @@
   .grp-row .grp-n{font-family:var(--gothic); font-size:14px; font-weight:700; color:var(--muted)}
   .grp-tg{flex:none; border:2px solid var(--ink); border-radius:999px; padding:3px 12px; font-size:14px; font-weight:700; background:var(--sun); color:var(--ink); white-space:nowrap}
   details[open] > summary .grp-tg{background:var(--card)}
+  .shots-grp > summary.grp-h > .grp-row{font-family:inherit; font-weight:inherit}   /* 送った写真の箱（2026-09-25）＝見出しは数だけ。作品名用の飾り文字（上の span:first-child）を当てない */
+  .shots-grp > summary.grp-h{justify-content:center}   /* 見出しが1行＝高さ48pxの中で上に寄らないように真ん中へ */
   .grp-sub{display:flex; flex-wrap:wrap; gap:4px 12px; font-size:14px; font-weight:700; color:var(--muted)}
   .grp-sub .hot{color:var(--alert)}
   .grp-all-row{display:flex; justify-content:flex-end}
@@ -541,7 +543,11 @@
 
   <section class="list" id="list" hidden>
     <h2>送った写真</h2>
-    <ul class="shots" id="shots"></ul>
+    <!-- 送った写真は増えていくので、ふだんは閉じる（2026-09-25 本人「増えていったら邪魔になると思うのでプルダウン形式で」）。閉じた見出しに枚数と行方の数を出す -->
+    <details class="grp shots-grp" id="shots-grp">
+      <summary class="grp-h"><span class="grp-row"><span class="grp-sub" id="shots-sum"></span><span class="grp-tg" id="shots-tg">ひらく ▼</span></span></summary>
+      <ul class="shots" id="shots"></ul>
+    </details>
   </section>
 
   <dl class="bar" id="bar" hidden>
@@ -773,6 +779,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var qnote = byId("qnote"), retryBtn = byId("retry"), bar = byId("bar");
   var nWait = byId("n-wait"), nDone = byId("n-done"), nSent = byId("n-sent");
   var list = byId("list"), shotsEl = byId("shots"), homeTip = byId("home-tip");
+  var shotsGrp = byId("shots-grp"), shotsSum = byId("shots-sum"), shotsTg = byId("shots-tg");
+  shotsGrp.addEventListener("toggle", function () { shotsTg.textContent = shotsGrp.open ? "とじる ▲" : "ひらく ▼"; });   // 開け閉めは覚えない＝開き直すと閉じている（2026-09-25 本人）
   var tabsEl = byId("tabs"), tabHome = byId("tab-home"), tabSend = byId("tab-send"), tabStock = byId("tab-stock");
   var paneHome = byId("pane-home"), paneSend = byId("pane-send"), paneStock = byId("pane-stock"), pcEl = byId("pc"), pcText = byId("pc-text");
   var stockBox = byId("stock"), stockNote = byId("stock-note"), findInput = byId("find"), filterEl = byId("filter");
@@ -1215,6 +1223,20 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     shotsEl.textContent = "";
     var all = hist.slice(0, 30), show = SHOW_ALL ? all : all.slice(0, 5);
     list.hidden = !all.length;
+    // 閉じた見出し＝枚数と行方の数。届いていない写真は赤で出す＝閉じたままでも困った写真があると分かる（2026-09-25）
+    var nOk = 0, nOff = 0, nNow = 0, nBad = 0;
+    all.forEach(function (h) {
+      var s = h.state || "受付";
+      if (s === "在庫") { if (inStock(h.label)) nOk += 1; else nOff += 1; }   // 外した品も数える＝内訳の合計が枚数と合う（別の目 2026-09-25）
+      else if (s === "届かず" || s === "待ち" || s === "bad") nBad += 1;
+      else nNow += 1;
+    });
+    shotsSum.textContent = "";
+    shotsSum.appendChild(el("span", "grp-n", all.length + "枚"));
+    if (nOk) shotsSum.appendChild(el("span", "", "在庫に入った " + nOk));
+    if (nOff) shotsSum.appendChild(el("span", "", "在庫から外した " + nOff));
+    if (nNow) shotsSum.appendChild(el("span", "", "途中 " + nNow));
+    if (nBad) shotsSum.appendChild(el("span", "hot", "届いていない " + nBad));
     show.forEach(function (h) {
       var st = h.state || "受付", kind = "busy", main = "送っています…", sub = "";
       // ★在庫から外した品の写真が「在庫に入りました」のまま残ると混乱する（2026-09-23 本人「ラプラスいるけど、これキャンセルしたよね」）
@@ -1488,7 +1510,11 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     byId("todo-orders").setAttribute("data-hot", oc ? "1" : "0");
     renderRetakes();
   }
-  byId("todo-wait").addEventListener("click", function () { showTab("send"); });
+  byId("todo-wait").addEventListener("click", function () {
+    showTab("send");
+    // 「見分け待ちの写真」から来た＝写真を見たい＝送った写真の箱を開いて、そこまで動く（ふだんは閉じている・2026-09-25 再検証で見つけた）
+    if (!list.hidden) { shotsGrp.open = true; setTimeout(function () { list.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); }
+  });
   byId("todo-price").addEventListener("click", function () { showTab("stock"); var b = filterEl.querySelector("button[data-f=未出品]"); if (b) b.click(); });
   byId("todo-trade").addEventListener("click", function () { showTab("stock"); var b = filterEl.querySelector("button[data-f=売れた]"); if (b) b.click(); });
   byId("todo-orders").addEventListener("click", function () { loadOrders(); if (!ordersBox.hidden) ordersBox.scrollIntoView({ behavior: "smooth", block: "start" }); });
@@ -1520,11 +1546,12 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   // ---- 在庫を見る（Claudeが台帳から作った一覧を読むだけ。ここからは書き換えない）----
   var STOCK = null, stockBusy = false, curFilter = "all";
   // 作品ごとの開け閉め（2026-09-16 本人「カテゴリごとにプルダウンできる形式に…scrollが長いので」）
-  // ★ふだんは閉じる。開け閉めはスマホに覚える＝1分おきの作り直しや開き直しで閉じない
+  // ★ふだんは閉じる。開け閉めは画面を開いている間だけ覚える＝1分おきの作り直しでは閉じない・開き直すと全部閉じる
   // ★しぼりこみ・検索の時は当てはまる作品を開いて出す（覚えている開け閉めは変えない＝その間だけの開け閉めは TEMP_OPEN）。作品が1つだけなら開く
-  var GROUP_KEY = "zaikoSnap.groupOpen.v1", GROUP_OPEN = {}, TEMP_OPEN = {}, TEMP_SIG = "";
-  try { var groupOpen0 = JSON.parse(localStorage.getItem(GROUP_KEY) || "null"); if (groupOpen0 && typeof groupOpen0 === "object") GROUP_OPEN = groupOpen0; } catch (e) {}
-  function saveGroupOpen() { try { localStorage.setItem(GROUP_KEY, JSON.stringify(GROUP_OPEN)); } catch (e) {} }
+  // 作品ごとの開け閉めは、この画面を開いている間だけ覚える＝開き直すと全部閉じた状態から（2026-09-25 本人「デフォルトが閉じてる状態だと認識してたけど開いてる…閉じるをデフォルト」）
+  //   前の版（2026-09-16〜）はスマホに覚えさせていたので、一度開いた作品が次も開いて出た＝その覚えも消す
+  var GROUP_OPEN = {}, TEMP_OPEN = {}, TEMP_SIG = "";
+  try { localStorage.removeItem("zaikoSnap.groupOpen.v1"); } catch (e) {}
   function groupForced() { return !!findInput.value.trim() || curFilter !== "all"; }
   function updateAllBtn() {
     var btn = byId("grp-all"), ds = [].slice.call(stockBox.querySelectorAll("details.grp"));
@@ -1708,7 +1735,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       // 押した時だけ覚える（作り直しで開け閉めを入れた時は覚えない）。click の時点ではまだ切り替わっていない＝次の状態は !sec.open
       h.addEventListener("click", function () {
         var next = !sec.open;
-        if (groupForced()) TEMP_OPEN[g.name] = next; else { GROUP_OPEN[g.name] = next; saveGroupOpen(); }
+        if (groupForced()) TEMP_OPEN[g.name] = next; else GROUP_OPEN[g.name] = next;
         setTimeout(updateAllBtn, 0);
       });
       sec.appendChild(h);
@@ -1804,7 +1831,6 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       var nm = d.getAttribute("data-name");
       if (forced) TEMP_OPEN[nm] = openAll; else GROUP_OPEN[nm] = openAll;
     });
-    if (!forced) saveGroupOpen();
     updateAllBtn();
   });
   // ---- 改良②（2026-09-13）：値段の画面（10円刻み）とスマホのお願い ----
