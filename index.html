@@ -430,10 +430,10 @@
   .px-gauge .g-med{position:absolute; top:3px; width:4px; height:22px; margin-left:-2px; background:var(--ink); border-radius:2px}
   .px-gauge .g-me{position:absolute; top:1px; width:20px; height:20px; margin-left:-10px; background:var(--pink); border:3px solid var(--ink); border-radius:50%; box-sizing:border-box; transition:left .12s}
   .px-gl{margin:0; display:flex; justify-content:space-between; gap:8px; font-size:12px; color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums}
-  .steps{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px}
-  .steps button{min-height:54px; border:3px solid var(--ink); border-radius:12px; background:#ffe0ee; font-family:var(--pop); font-weight:400; font-size:18px; color:var(--ink); box-shadow:3px 3px 0 var(--ink); touch-action:manipulation; user-select:none; -webkit-user-select:none; padding:0}
-  .steps button[data-d^="-"]{background:#d8f1ff}
-  .steps button:active{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+  .steps, .rp-steps{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px}   /* .rp-steps＝値段を直す画面の＋−（見た目は同じ・名前を分けて値段の画面の＋−と混ざらないように＝2026-09-29） */
+  .steps button, .rp-steps button{min-height:54px; border:3px solid var(--ink); border-radius:12px; background:#ffe0ee; font-family:var(--pop); font-weight:400; font-size:18px; color:var(--ink); box-shadow:3px 3px 0 var(--ink); touch-action:manipulation; user-select:none; -webkit-user-select:none; padding:0}
+  .steps button[data-d^="-"], .rp-steps button[data-d^="-"]{background:#d8f1ff}
+  .steps button:active, .rp-steps button:active{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
   .px-ref{align-self:center; border:2px solid var(--ink); border-radius:999px; background:var(--card); color:var(--ink); padding:5px 16px; font-weight:700; font-size:14px}
   .chans{margin:0; border:3px solid var(--ink); border-radius:18px; background:var(--card); padding:8px 12px 10px; min-width:0}
   .chans legend{padding:0 6px; font-weight:700; font-size:14px}
@@ -464,6 +464,10 @@
   .orders .o-top{display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; font-weight:700}
   .orders .o-note{color:var(--muted); font-size:13px}
   .orders .o-cancel{align-self:flex-start; border:2px solid var(--ink); border-radius:10px; background:var(--card); color:var(--alert); font-weight:700; font-size:15px; padding:8px 18px; min-height:40px}
+  /* 値段を直す（2026-09-29）＝「取り消す」と離して並べる（押し間違えると取り消しはすぐ送られる）。指で押しやすい高さに */
+  .orders .o-acts{display:flex; flex-wrap:wrap; align-items:center; gap:16px 24px}
+  .orders .o-acts button{min-height:44px; font-size:16px}
+  .orders .o-reprice{border:2px solid var(--ink); border-radius:10px; background:var(--sun); color:var(--ink); font-weight:700; padding:8px 18px; box-shadow:2px 2px 0 var(--ink)}
 </style>
 </head>
 <body>
@@ -640,6 +644,7 @@
     <div class="sh-acts" id="sh-acts">
       <button type="button" class="sh-close" id="sh-close">閉じる</button>
       <button type="button" class="pick sh-go" id="sh-go">出品をお願いする</button>
+      <button type="button" class="pick sh-go" id="sh-rp" hidden>値段を直す</button>
     </div>
     <div class="sh-acts sh-confirm" id="sh-confirm" hidden>
       <p class="cf-text" id="cf-text" role="status" aria-live="polite"></p>
@@ -693,6 +698,37 @@
     </div>
     <button type="button" class="sh-cancel" id="ak-cancel" hidden>このお願いを取り消す</button>
     <p class="sh-foot" id="ak-foot"></p>
+  </section>
+</div>
+
+<div class="sheet-back" id="rpsheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="rp-what">
+    <header class="sh-head">
+      <p class="sh-grp" id="rp-grp"></p>
+      <h2 class="sh-what" id="rp-what" tabindex="-1"></h2>
+      <p class="sh-now" id="rp-now"></p>
+    </header>
+    <div class="px-box">
+      <p class="px-label">直した値段</p>
+      <p class="px"><span class="yen">¥</span><input id="rp-price" type="text" inputmode="numeric" autocomplete="off" aria-label="直した値段（円）"></p>
+      <div class="rp-steps" role="group" aria-label="値段を10円・100円ずつ動かす">
+        <button type="button" data-d="-100">−100</button>
+        <button type="button" data-d="-10">−10</button>
+        <button type="button" data-d="10">＋10</button>
+        <button type="button" data-d="100">＋100</button>
+      </div>
+    </div>
+    <p class="sh-msg" id="rp-msg" role="status" aria-live="polite" hidden></p>
+    <div class="sh-acts" id="rp-acts">
+      <button type="button" class="sh-close" id="rp-close">閉じる</button>
+      <button type="button" class="pick sh-go" id="rp-go">この値段に直す</button>
+    </div>
+    <div class="sh-acts sh-confirm" id="rp-confirm" hidden>
+      <p class="cf-text" id="rp-cf" role="status" aria-live="polite"></p>
+      <button type="button" class="sh-close" id="rp-back">戻る</button>
+      <button type="button" class="pick sh-go" id="rp-cfgo">この内容で<wbr>直す</button>
+    </div>
+    <p class="sh-foot"><span class="ph">値段を直せるのは、</span><span class="ph">パソコンが</span><span class="ph">準備を始める前</span><span class="ph">（受付の間）</span><span class="ph">だけです。</span><span class="ph">準備が始まった後は、</span><span class="ph">このお願いを</span><span class="ph">取り消してから</span><span class="ph">出し直してください。</span></p>
   </section>
 </div>
 
@@ -833,7 +869,9 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
 
   // 送り直しても答えが変わらない返事（合言葉違い・大きすぎる・取り消しの時間切れ・値段や出品先の不備）は、送り直さずにそのまま伝える
   var prevCleared = false;
-  var HARD = ["not_allowed", "too_large", "too_late", "bad_price", "no_channel", "bad_order", "no_order", "old_server", "already", "bad_store"];
+  var HARD = ["not_allowed", "too_large", "too_late", "bad_price", "no_channel", "bad_order", "no_order", "old_server", "already", "bad_store",
+              "not_waiting", "closed", "canceled",   // 2026-09-29 値段を直す：準備が始まった・済んだ・取り消した＝送り直しても変わらない
+              "bad_kind"];   // 2026-09-29 別の目：古い受け口が知らない種類＝「古い版です」と出す（無いと送り直しの末に「送れませんでした」に化けていた）
   // Googleのログイン状態に左右されないよう、Cookieを付けずに送る
   function apiOnce(op, extra, ms, sendOnly) {
     var body = { k: CFG.k, op: op };
@@ -1856,6 +1894,11 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     if (!CANCEL_ANY) return false;
     return o.kind === "値段変更" || !Object.keys(o.listings || {}).length;
   }
+  // ---- 2026-09-29 本人「この値段で出品した際に、やっぱり違う金額したいときに修正できないから修正できるボタンも追加して欲しい」----
+  //   ★直せるのは受付の間だけ（パソコンが取ると準備中＝もうフォームに前の値段を入れ始めている）。種類は値段を持つ出品・値段変更だけ。
+  //   ★受け口の返事に reprice の印がある時だけ出す（古い受け口は知らない問い合わせとして断るだけ＝押せる形にしない）
+  var REPRICE = false;
+  function canReprice(o) { return REPRICE && !!o && o.state === "受付" && (o.kind === "出品" || o.kind === "値段変更"); }
   // ---- 2026-09-23 本人指示：出品をやめる／お金が入った（売却済みにする）----
   //   本人「在庫スナップで売れたけど相手から連絡なくて運営側からお金が入ったときに売却済みにするボタン追加」
   //        「出品中の商品のキャンセルボタンも追加して」
@@ -1885,6 +1928,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var shKind = byId("sh-kind"), shPrice = byId("sh-price"), shGauge = byId("sh-gauge"), shGl = byId("sh-gl"), shUseRef = byId("sh-useref");
   var shChans = byId("sh-chans"), shMemo = byId("sh-memo"), shMsg = byId("sh-msg"), shGo = byId("sh-go"), shClose = byId("sh-close"), shCancel = byId("sh-cancel");
   var shActs = byId("sh-acts"), shConfirm = byId("sh-confirm"), cfText = byId("cf-text"), cfGo = byId("cf-go"), cfBack = byId("cf-back");
+  var shRp = byId("sh-rp");   // お願い中（受付）の品物を開いた時の「値段を直す」（2026-09-29）
   var CF = null;   // 送る前の確認を出した時刻（出している間だけ）
   var stopSheet = byId("stopsheet"), stGrp = byId("st-grp"), stWhat = byId("st-what"), stNow = byId("st-now"), stList = byId("st-list"), stClose = byId("st-close");
   var ordersBox = byId("orders-box"), ordersList = byId("orders-list");
@@ -1938,6 +1982,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       ordersBusy = false;
       ORDERS = j.orders || [];
       CANCEL_ANY = j.cancelAny === true;
+      REPRICE = j.reprice === true;
       ASK_KINDS = {};
       (j.kinds || []).forEach(function (k) { ASK_KINDS[k] = true; });
       ordersFresh = true;
@@ -1946,6 +1991,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       renderStock();
       renderOrders();
       if (SH) openSheet(SH.g, SH.it, true);   // 開いている値段の画面も、読めた一覧で出し直す
+      if (RP) rpSync();   // 値段を直す画面を開いている間に、パソコンが取った・取り消された時は知らせる
     }, function (e) {
       ordersBusy = false;
       ordersErr = (e && e.code) || "network";
@@ -1965,15 +2011,25 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       // ★前の道具はメモに「メルカリ・ラクマ・ヤフフリマに出品しました（¥600）」と書いていた＝隣の値段と販路が2回ずつ出た（2026-09-16 点検その3）
       var chs = (o.channels || []).join("・"), note = String(o.note || ""), dup = !!note && !!chs && note.indexOf(chs) !== -1 && note.indexOf(yen(o.price).slice(1)) !== -1;
       li.appendChild(segs(el("p", "o-note"), dup ? note : yen(o.price) + "・" + chs + (note ? "　" + note : "")));
+      // 値段を直す（2026-09-29）＝受付の間だけ。「取り消す」と同じ行に離して並べる（印の無い受け口・受付でない時は今までどおり取り消すだけ）
+      var acts = null;
+      if (canReprice(o)) {
+        acts = el("div", "o-acts");
+        var rp = el("button", "o-reprice", "値段を直す");
+        rp.type = "button";
+        rp.addEventListener("click", function () { openReprice(o); });
+        acts.appendChild(rp);
+      }
       if (canCancel(o)) {
         var c = el("button", "o-cancel", "取り消す");
         c.type = "button";
         c.addEventListener("click", function () { cancelOrder(o, c); });
-        li.appendChild(c);
+        (acts || li).appendChild(c);
       } else if (CANCEL_ANY && OPEN_STATES[o.state]) {
         // ボタンが無い理由を書く（どこかの販路に出品IDが付いた出品のお願い＝もう公開されている）
         li.appendChild(segs(el("p", "o-note"), "もう出品が始まっているので、ここでは取り消せません"));
       }
+      if (acts) li.appendChild(acts);
       ordersList.appendChild(li);
     });
     renderRedWait();
@@ -2013,6 +2069,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       saveOrders();
       if (SH && SH.order && SH.order.uid === o.uid) closeSheet();
       if (AK && AK.order && AK.order.uid === o.uid) closeAsk();
+      if (RP && RP.order.uid === o.uid) closeReprice();
       renderStock();
       renderOrders();
     }
@@ -2589,6 +2646,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     shCancel.hidden = !(busy && canCancel(SH.order));
     shCancel.disabled = false;
     shCancel.textContent = "このお願いを取り消す";
+    shRp.hidden = !(busy && canReprice(SH.order));
     [shPrice, shMemo, shUseRef].concat([].slice.call(shChans.querySelectorAll("input")), [].slice.call(sheet.querySelectorAll(".steps button"))).forEach(function (x) { x.disabled = busy; });
     if (!keep && !ordersFresh) ordersErr = null;   // 開くたびに読み直す（前に読めなかった知らせは消す）
     if (busy && SH.already) sheetMsg("bad", ["この品物は、", "もうお願い済みでした", "（別のスマホか、前に押した分）。", "お願い中です（" + SH.order.state + "・" + yen(SH.order.price) + "）。"]);
@@ -2749,6 +2807,182 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       sheetMsg("bad", c === "bad_price" ? ["値段が", "受け付けられませんでした"] : ["送れませんでした。", "電波の良い所で、", "もう一度", "押してください"]);
     });
   }
+
+  // ---- 値段を直す画面（2026-09-29 本人「出品依頼したやつだけどやっぱり値段変えたいときのボタン先にやって」）----
+  //   押す → 今の値段が入った欄 → 「¥500 → ¥600 に直します」の確認 → 送る → 結果を出して一覧を読み直す。
+  //   ★確認はお願いを送る時と同じ形（戻る／出てすぐの2度押しでは送らない）。★断られた時は値段は変わっていない＝理由を平易に出す
+  var rpSheet = byId("rpsheet"), rpGrp = byId("rp-grp"), rpWhat = byId("rp-what"), rpNow = byId("rp-now"), rpPrice = byId("rp-price");
+  var rpMsg = byId("rp-msg"), rpActs = byId("rp-acts"), rpGo = byId("rp-go"), rpConfirm = byId("rp-confirm"), rpCf = byId("rp-cf");
+  var RP = null, RPCF = null;   // RP＝いま直しているお願い { order, from, price, busy, done }／RPCF＝確認を出した時刻
+  var RP_MSG = {
+    not_waiting: ["パソコンで", "準備が", "始まっています。", "値段を変えるときは、", "このお願いを", "取り消してから", "出し直してください"],
+    closed: ["このお願いは", "もう済んでいます。", "値段を変えるときは、", "在庫の一覧から", "もう一度", "お願いしてください"],
+    canceled: ["このお願いは", "取り消されています"],
+    bad_price: ["その値段には", "直せません。", "300円から", "9,999,990円までの", "数字で", "入れてください"],
+    no_order: ["このお願いが", "見つかりませんでした。", "一覧を", "読み直します"]
+  };
+  function rpSay(kind, parts) {
+    if (!kind) { rpMsg.hidden = true; return; }
+    rpMsg.setAttribute("data-kind", kind);
+    put(rpMsg, parts);
+    rpMsg.hidden = false;
+  }
+  function rpLock(on) { [rpPrice].concat([].slice.call(rpSheet.querySelectorAll(".rp-steps button"))).forEach(function (x) { x.disabled = on; }); }
+  function rpBack() {
+    RPCF = null;
+    rpConfirm.hidden = true;
+    rpActs.hidden = false;
+    if (RP && !RP.busy && !RP.done) rpLock(false);
+  }
+  function closeReprice() {
+    RPCF = null;
+    rpConfirm.hidden = true;
+    rpActs.hidden = false;
+    rpSheet.hidden = true;
+    if (sheet.hidden && stopSheet.hidden && askSheet.hidden) document.body.classList.remove("sheet-open");
+    RP = null;
+  }
+  function openReprice(o) {
+    if (!canReprice(o)) return;
+    if (!sheet.hidden) closeSheet();
+    if (!askSheet.hidden) closeAsk();
+    RP = { order: o, from: Math.round(Number(o.price) || 0), price: 0, busy: false, done: false };
+    rpGrp.textContent = "";
+    segs(rpGrp, o.group || "");
+    rpWhat.textContent = "";
+    segs(rpWhat, (o.label || "") + "　" + (o.what || ""));
+    var was = o.kind === "値段変更" ? digits(o.was) : 0;
+    put(rpNow, ["お願いした値段：" + yen(RP.from)].concat(was ? ["（いま出ている値段は", yen(was) + "）"] : ["（" + kindName(o.kind) + "）"]));
+    rpPrice.value = String(RP.from);
+    rpBack();
+    rpGo.disabled = false;
+    rpGo.textContent = "この値段に直す";
+    rpSay(null);
+    rpSheet.hidden = false;
+    document.body.classList.add("sheet-open");
+    rpSheet.querySelector(".sheet").scrollTop = 0;
+    rpWhat.focus({ preventScroll: true });
+  }
+  // 欄の数字を確かめる（だめな時は理由を出して 0 を返す）。10円きざみにそろえるのは値段の画面と同じ
+  function rpRead() {
+    var raw = digits(rpPrice.value);
+    if (raw < 300) { rpSay("bad", ["300円より", "安い値段には", "できません"]); return 0; }
+    if (raw > 9999990) { rpSay("bad", ["値段が", "大きすぎます", "（9,999,990円まで）"]); return 0; }
+    var p = clampPrice(raw);
+    rpPrice.value = String(p);
+    if (p === RP.from) { rpSay("bad", ["いまの", "お願いと", "同じ値段です"]); return 0; }
+    // 値段の変更で、いま出ている値段と同じ＝パソコンの道具が「値段が変わらない」で止める。先にここで知らせる
+    if (RP.order.kind === "値段変更" && digits(RP.order.was) === p) { rpSay("bad", ["いま出ている値段と", "同じです。", "値段の変更を", "やめるときは、", "このお願いを", "取り消してください"]); return 0; }
+    return p;
+  }
+  function rpShowConfirm() {
+    if (!RP || RP.busy || RP.done) return;
+    var p = rpRead();
+    if (!p) return;
+    RP.price = p;
+    rpCf.textContent = "";
+    rpCf.appendChild(el("span", "ph", yen(RP.from) + " →"));
+    rpCf.appendChild(document.createTextNode(" "));
+    rpCf.appendChild(el("span", "ph cf-big", yen(p)));
+    rpCf.appendChild(el("span", "ph", "に直します"));
+    var line2 = el("span", "cf-chans");
+    put(line2, ["出品先：", (RP.order.channels || []).map(chanLabel).join("・")]);
+    rpCf.appendChild(line2);
+    RPCF = Date.now();
+    rpLock(true);
+    rpActs.hidden = true;
+    rpConfirm.hidden = false;
+    rpSay(null);
+  }
+  function rpSend() {
+    if (!RP || RP.busy || RP.done || !RP.price) return;
+    var me = RP, p = me.price, uid = me.order.uid;
+    me.busy = true;
+    rpBack();   // 確認をしまう（送っている間は、欄と＋−は動かせないまま）
+    rpGo.disabled = true;
+    rpGo.textContent = "送っています…";
+    function done(got) {
+      ORDERS = (ORDERS || []).map(function (x) { return x.uid === got.uid ? got : x; });   // 並び順は変えない（お願いの一覧の上下が入れ替わらない）
+      saveOrders();
+      renderStock();
+      renderOrders();
+      loadOrders();   // 受け口の今の姿で一覧を読み直す
+      if (RP !== me) return;
+      me.busy = false;
+      me.done = true;
+      me.order = got;
+      rpGo.textContent = "直しました";
+      rpSay("ok", ["値段を直しました", "（" + yen(me.from) + "→" + yen(p) + "）。", "パソコンのClaudeが", "動いた時に", "流します。"]);
+      setTimeout(function () { if (RP === me) closeReprice(); }, 1600);
+    }
+    api("reprice", { uid: uid, price: p }, 15000, 2).then(function (j) {
+      done(j.order || Object.assign({}, me.order, { price: p }));
+    }, function (e) {
+      var c = e && e.code;
+      // ★返事が3秒来ないと同じお願いをもう1本送る（apiRace）。1本目で直せた後にパソコンが取ると、2本目は not_waiting で返る＝値段が直っていれば成功
+      if (c === "not_waiting" && e.order && Number(e.order.price) === p) return done(e.order);
+      if (RP !== me) return;
+      me.busy = false;
+      if (c === "bad_price") {
+        rpLock(false);
+        rpGo.disabled = false;
+        rpGo.textContent = "この値段に直す";
+        return rpSay("bad", RP_MSG.bad_price);
+      }
+      if (RP_MSG[c] || c === "old_server" || c === "not_allowed" || c === "bad_store") {
+        // 送り直しても変わらない断り＝押せないままにして、理由を出す（準備が始まった時は、取り消して出し直す道を言う）
+        me.done = true;
+        rpGo.textContent = "直せません";
+        rpSay("bad", RP_MSG[c] || (c === "not_allowed" ? reason("not_allowed") : c === "bad_store" ? STORE_MSG : OLD_MSG));
+        if (RP_MSG[c]) loadOrders();
+        return;
+      }
+      rpLock(false);   // 電波などで届かなかった時だけ、もう一度押せる（同じ値段の送り直しは受け口で1回分になる）
+      rpGo.disabled = false;
+      rpGo.textContent = "この値段に直す";
+      rpSay("bad", ["送れませんでした。", "電波の良い所で、", "もう一度", "押してください"]);
+    });
+  }
+  // 一覧を読み直した時、開いているお願いがもう受付でなければ（パソコンが取った・取り消された・済んだ）、押す前に知らせる
+  function rpSync() {
+    if (!RP || RP.busy || RP.done) return;
+    var f = (ORDERS || []).filter(function (x) { return x.uid === RP.order.uid; })[0];
+    if (!f || f.state === "受付") return;
+    RP.done = true;
+    RPCF = null;
+    rpConfirm.hidden = true;
+    rpActs.hidden = false;
+    rpLock(true);
+    rpGo.disabled = true;
+    rpGo.textContent = "直せません";
+    rpSay("bad", RP_MSG[f.state === "取り消し" ? "canceled" : OPEN_STATES[f.state] ? "not_waiting" : "closed"]);
+  }
+  [].forEach.call(rpSheet.querySelectorAll(".rp-steps button"), function (b) {
+    var d = Number(b.getAttribute("data-d"));
+    // 1回押すごとに1刻み（押しっぱなしでは動かさない＝スクロールしようとした指で値段が動かない）
+    b.addEventListener("click", function () {
+      if (!RP || b.disabled) return;
+      rpPrice.value = String(clampPrice(digits(rpPrice.value) + d));
+      rpSay(null);
+    });
+    b.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  });
+  rpPrice.addEventListener("input", function () {
+    var v = String(rpPrice.value).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[^\d]/g, "").slice(0, 7);
+    if (v !== rpPrice.value) rpPrice.value = v;
+    rpSay(null);
+  });
+  rpPrice.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); rpPrice.blur(); rpShowConfirm(); } });
+  rpGo.addEventListener("click", rpShowConfirm);
+  byId("rp-back").addEventListener("click", rpBack);
+  byId("rp-cfgo").addEventListener("click", function () {
+    if (!RPCF || Date.now() - RPCF < 600) return;   // 続けて2回押した（ダブルタップ）だけでは送らない
+    rpSend();
+  });
+  byId("rp-close").addEventListener("click", closeReprice);
+  rpSheet.addEventListener("click", function (e) { if (e.target === rpSheet) closeReprice(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !rpSheet.hidden) closeReprice(); });
+  shRp.addEventListener("click", function () { if (SH && SH.order && canReprice(SH.order)) openReprice(SH.order); });
 
   tabHome.addEventListener("click", function () { showTab("home"); });
   tabSend.addEventListener("click", function () { showTab("send"); });
