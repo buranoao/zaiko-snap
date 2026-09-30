@@ -1748,7 +1748,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       if (!items.length) return;
       var sec = el("details", "grp"), h = el("summary", "grp-h"), n = 0;
       var saved = forced ? TEMP_OPEN[g.name] : GROUP_OPEN[g.name];
-      sec.open = saved != null ? !!saved : (forced || nGroups === 1);
+      sec.open = saved != null ? !!saved : false;   // 2026-09-30 本人「全部閉じてる状態がデフォルト」→「2」＝絞り込み・名前で探した時も、1作品だけの時も、最初は閉じる（開け閉めした状態はその場で覚える）
       sec.setAttribute("data-name", g.name);
       var c = {}, rtN = 0, odN = 0;
       items.forEach(function (it) {
