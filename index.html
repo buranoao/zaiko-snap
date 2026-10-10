@@ -772,10 +772,10 @@
     <ol class="cd-shots" id="cd-shots" aria-label="撮った写真"></ol>
     <p class="cd-guide" id="cd-guide"></p>
     <input type="file" id="cd-cam" accept="image/*" capture="environment">
-    <input type="file" id="cd-album" accept="image/*">
+    <input type="file" id="cd-album" accept="image/*" multiple>
     <div class="rt-picks" id="cd-picks">
       <label class="pick" for="cd-cam"><span class="ph" id="cd-side1">1枚目を</span><span class="ph">カメラで撮る</span></label>
-      <label class="pick" for="cd-album"><span class="ph" id="cd-side2">1枚目を</span><span class="ph">アルバムから</span></label>
+      <label class="pick" for="cd-album"><span class="ph">アルバムから</span><span class="ph" id="cd-side2">5枚まで選ぶ</span></label>
     </div>
     <p class="rt-msg" id="cd-msg" role="status" hidden></p>
     <div class="memo-row cd-memo-row" id="cd-memo-row">
@@ -1950,10 +1950,11 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   function nearOf(r) { return r && r.近い物 && r.近い物.中央値 ? r.近い物 : null; }
   function nearWhy(n) { var j = String((n && n.判定) || ""); return j.indexOf("まだ混ざって") === 0 ? "（値段の幅が広い＝絵柄やレア度で大きく違う）" : j.indexOf("少ない") === 0 ? "（売れた例が少ない）" : ""; }
   function refWhy(j) { j = String(j || ""); return j.indexOf("少ない") === 0 ? "売れた例が少ない（5件未満）ので、目安です" : j.indexOf("まだ混ざって") === 0 ? "別の絵柄が混ざっているかもしれません" : j; }
-  // お店の販売価格で出す品物（r.店＝店の名前）＝ワンピはメルカリの出品名でパラレルかどうかが分からず別の版が混ざる（2026-10-10 シャンクスの通常版に¥7,777）
-  function shopOf(r) { return r && r.店 && r.中央値 ? r : null; }
+  // Yahoo!フリマの平均で出す品物（r.出どころ＝"ヤフフリマ"・中央値の欄に平均が入っている）＝2026-10-10 本人「yahooフリマの平均値を標準の金額設定にして」。
+  //   カードの専門店（遊々亭など）の値段は出さない（本人「転売専門店の価格なんて絶対に参考にしないで」）
+  function yfOf(r) { return r && r.出どころ === "ヤフフリマ" && r.中央値 ? r : null; }
   function refLine(r) {
-    if (shopOf(r)) return "お店 " + yen(r.中央値) + "（" + r.店 + "）";
+    if (yfOf(r)) return "ヤフフリマ平均 " + yen(r.中央値) + "（" + r.件数 + "件" + (usable(r) ? "" : "・少なめ") + "）";
     if (r && r.中央値) return "参考 " + yen(r.中央値) + "（" + r.件数 + "件" + (usable(r) ? "" : String(r.判定 || "").indexOf("少ない") === 0 ? "・少なめ" : "・混ざりあり") + "）";
     var n = nearOf(r);
     return n ? "同じキャラ " + yen(n.中央値) + "（" + n.件数 + "件）" : "";
@@ -2330,7 +2331,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     shots.forEach(function (s, i) { box.appendChild(cdSlot(i, s, sent)); });
     if (!sent && n < CD_MAX) box.appendChild(cdSlot(n, null, false));
     byId("cd-side1").textContent = n ? "もう1枚" : "1枚目を";
-    byId("cd-side2").textContent = n ? "もう1枚" : "1枚目を";
+    byId("cd-side2").textContent = n ? "あと" + (CD_MAX - n) + "枚まで選ぶ" : "5枚まで選ぶ";   // アルバムからはまとめて選べる（2026-10-10 本人「1」＝いつものカメラで撮ってから選ぶ）
     byId("cd-picks").hidden = sent || n >= CD_MAX;   // 5枚になったら「もう1枚」は出さない
     go.hidden = sent || !n;
     go.disabled = sent || !n;
@@ -2371,20 +2372,29 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   }
   function cdUnsent() { return !!(CD && !CD.sent && CD.shots.length); }
   function sameFile(a, b) { return !!(a && b) && a.name === b.name && a.size === b.size && a.lastModified === b.lastModified; }
+  // ★アルバムからは、残りの枠の数まで（最大5枚）まとめて受け取る（2026-10-10 本人「カメラ替えられない？」→「1」）。
+  //   ページの「カメラで撮る」は Android がカメラを簡易な形で開く＝手ぶれ補正やライトが使えない。いつものカメラで撮って、ここでまとめて選ぶ。
+  //   並びは選んだ順のまま（1枚目＝一覧の顔）。同じ写真の2回入れは弾く。枠を超えた分は入れずに、そう言う
   function pickCard(input) {
-    var picked = Array.prototype.slice.call(input.files || []).filter(function (f) { return f && f.size > 0; }).slice(0, 1);   // 1枚だけ
+    var picked = Array.prototype.slice.call(input.files || []).filter(function (f) { return f && f.size > 0; });
     input.value = "";
     if (!CD || CD.sent || !picked.length) return;
-    var f = picked[0], n = CD.shots.length;
-    if (n >= CD_MAX) return cdSay(["5枚まで", "です。"]);
-    for (var j = 0; j < n; j++) {
-      if (sameFile(CD.shots[j].file, f)) return cdSay(["その写真は", "もう入っています", "（" + (j + 1) + "枚目）。", "別の写真を", "撮ってください。"]);
-    }
-    var url = "";
-    try { url = URL.createObjectURL(f); } catch (e) {}
-    CD.shots.push({ file: f, url: url });
+    var n0 = CD.shots.length, dup = 0, dupAt = 0, over = 0;
+    if (n0 >= CD_MAX) return cdSay(["5枚まで", "です。"]);
+    picked.forEach(function (f) {
+      var n = CD.shots.length;
+      for (var j = 0; j < n; j++) { if (sameFile(CD.shots[j].file, f)) { dup++; dupAt = dupAt || j + 1; return; } }
+      if (n >= CD_MAX) { over++; return; }
+      var url = "";
+      try { url = URL.createObjectURL(f); } catch (e) {}
+      CD.shots.push({ file: f, url: url });
+    });
+    var got = CD.shots.length - n0;
     cdRender();
-    cdSay([(n + 1) + "枚目を", "受け取りました。"]);
+    var say = got === 1 ? [(n0 + 1) + "枚目を", "受け取りました。"] : got > 1 ? [(n0 + 1) + "〜" + (n0 + got) + "枚目を", "受け取りました。"] : [];
+    if (dup) say = say.concat(got ? ["同じ写真" + dup + "枚は", "もう入っているので", "外しました。"] : ["その写真は", "もう入っています", "（" + dupAt + "枚目）。", "別の写真を", "選んでください。"]);
+    if (over) say = say.concat(["5枚までなので、", "残りの" + over + "枚は", "入れていません。"]);
+    cdSay(say);
   }
   function sendCard() {
     if (!CD || CD.sent || !CD.shots.length) return;
@@ -2578,7 +2588,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       shGl.hidden = false;
       shGauge.querySelector(".g-med").style.left = pos(gr.中央値) + "%";
       shGauge.querySelector(".g-me").style.left = pos(p) + "%";
-      put(shGl, ["安い " + yen(lo), "真ん中 " + yen(gr.中央値), "高い " + yen(hi)]);
+      put(shGl, ["安い " + yen(lo), (yfOf(gr) ? "平均 " : "真ん中 ") + yen(gr.中央値), "高い " + yen(hi)]);   // Yahoo!フリマの品物は平均（2026-10-10）
     } else {
       shGauge.hidden = true;
       shGl.hidden = true;
@@ -2605,13 +2615,10 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     put(shNow, listed ? ["いまの値段：", it.price || "–", "（" + String(it.where || "").replace(/[✅*]/g, "") + "）"] : ["手元に" + (it.count || 0) + "枚", "・まだ出していない"]);
     shRef.textContent = "";
     var near = nearOf(r), has = !!(r && r.中央値);
-    if (shopOf(r)) {
-      shRef.appendChild(segs(el("p", ""), "参考（お店の販売価格＝" + r.店 + (r.版 ? "・" + r.版 : "") + "）"));
-      var sp = el("p", "ref-num");
-      sp.appendChild(el("b", "", yen(r.中央値)));
-      if (r.買取) sp.appendChild(document.createTextNode("　お店の買取 " + yen(r.買取)));
-      shRef.appendChild(sp);
-      shRef.appendChild(segs(el("p", "small"), "※メルカリは版が混ざるため、お店の値段です　調べた日：" + when(r.調べた)));
+    if (yfOf(r)) {
+      shRef.appendChild(segs(el("p", ""), r.数え方 === "売れた" ? "参考（Yahoo!フリマで売れた値段の平均）" : "参考（Yahoo!フリマの平均・売れた例が少ないので、出品中の値段も入れた）"));
+      shRef.appendChild(refNums(r));
+      shRef.appendChild(segs(el("p", "small"), (usable(r) ? "" : "※" + refWhy(r.判定) + "　") + (r.版 ? "版：" + r.版 + "　" : "") + "調べた日：" + when(r.調べた)));
     } else if (has) {
       shRef.appendChild(segs(el("p", ""), "参考（メルカリで売れた値段の真ん中）"));
       shRef.appendChild(refNums(r));
