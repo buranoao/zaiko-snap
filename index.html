@@ -1996,6 +1996,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   //   カードの専門店（遊々亭など）の値段は出さない（本人「転売専門店の価格なんて絶対に参考にしないで」）
   function yfOf(r) { return r && r.出どころ === "ヤフフリマ" && r.中央値 ? r : null; }
   function refLine(r) {
+    if (r && r.出どころ === "目安" && r.中央値) return "目安 " + yen(r.中央値) + "（1枚売りが見つからない）";   // 2026-10-10 本人「1」＝どこにも無い通常版は一番安い値段の帯を目安に
     if (yfOf(r)) return "ヤフフリマ平均 " + yen(r.中央値) + "（" + r.件数 + "件" + (usable(r) ? "" : "・少なめ") + "）";
     if (r && r.中央値) return "参考 " + yen(r.中央値) + "（" + r.件数 + "件" + (usable(r) ? "" : String(r.判定 || "").indexOf("少ない") === 0 ? "・少なめ" : "・混ざりあり") + "）";
     var n = nearOf(r);
@@ -2659,14 +2660,19 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     put(shNow, listed ? ["いまの値段：", it.price || "–", "（" + String(it.where || "").replace(/[✅*]/g, "") + "）"] : ["手元に" + (it.count || 0) + "枚", "・まだ出していない"]);
     shRef.textContent = "";
     var near = nearOf(r), has = !!(r && r.中央値);
-    if (yfOf(r)) {
+    if (r && r.出どころ === "目安" && r.中央値) {   // 2026-10-10 本人「1」＝この版の1枚売りがどこにも無い（売れた値段ではない）
+      shRef.appendChild(segs(el("p", ""), "目安 " + yen(r.中央値) + "（この版の1枚売りが見つからないので、一番安い値段の帯）"));
+      shRef.appendChild(segs(el("p", "small"), "※売れた値段ではありません（Yahoo!\u2060フリマにもメルカリにも無い）　" + (r.版 ? "版：" + r.版 + "　" : "") + "調べた日：" + when(r.調べた)));   // \u2060＝「Yahoo!」と「フリマ」の間で折らない
+    } else if (yfOf(r)) {
       shRef.appendChild(segs(el("p", ""), r.数え方 === "売れた" ? "参考（Yahoo!フリマで売れた値段の平均）" : "参考（Yahoo!フリマの平均・売れた例が少ないので、出品中の値段も入れた）"));
       shRef.appendChild(refNums(r));
       shRef.appendChild(segs(el("p", "small"), (usable(r) ? "" : "※" + refWhy(r.判定) + "　") + (r.版 ? "版：" + r.版 + "　" : "") + "調べた日：" + when(r.調べた)));
     } else if (has) {
       shRef.appendChild(segs(el("p", ""), "参考（メルカリで売れた値段の真ん中）"));
       shRef.appendChild(refNums(r));
-      shRef.appendChild(segs(el("p", "small"), (usable(r) ? (r.判定 !== "OK" ? "※" + r.判定 + "　" : "") : "※" + refWhy(r.判定) + "　") + "調べた日：" + when(r.調べた)));
+      shRef.appendChild(segs(el("p", "small"), r.出どころ === "メルカリ"   // 番号で探したパラレルなど（2026-10-10）＝「※OK（…）」と書かない
+        ? (usable(r) ? "" : "※" + refWhy(r.判定) + "　") + "番号で探した" + (r.版 ? "・版：" + r.版 : "") + "　調べた日：" + when(r.調べた)
+        : (usable(r) ? (r.判定 !== "OK" ? "※" + r.判定 + "　" : "") : "※" + refWhy(r.判定) + "　") + "調べた日：" + when(r.調べた)));
     }
     if (near && !usable(r)) {
       if (has) shRef.appendChild(el("hr", "ref-sep"));
