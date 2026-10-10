@@ -416,6 +416,13 @@
   .sh-grp{margin:0; font-size:13px; color:var(--muted); font-weight:700}
   .sh-what{margin:0; font-size:19px; line-height:1.45; outline:none}
   .sh-now{margin:2px 0 0; font-size:14px; font-weight:700}
+  /* 番号をコピー（2026-10-10 本人「op17-037 R とかあるけど…これコピペできるように機能追加して」） */
+  .cp{justify-self:start; display:inline-flex; align-items:center; gap:6px; min-height:44px; margin-top:6px; padding:4px 14px; border:2px solid var(--ink); border-radius:999px; background:var(--card); color:var(--ink); font-family:var(--gothic); font-weight:700; font-size:15px; line-height:1.3; cursor:pointer; white-space:nowrap}
+  .cp b{font-family:var(--mono); font-size:16px; letter-spacing:.02em}
+  .cp:active{transform:translate(1px,1px)}
+  .cp[data-done="1"]{background:var(--accent); color:var(--on-accent); border-color:var(--accent)}
+  .cp[data-done="2"]{background:var(--alert-soft); color:var(--alert)}
+  .sh-cp:empty{display:none}
   .sh-ref{background:var(--card); border:2px solid var(--ink); border-radius:14px; padding:10px 12px; font-size:14px; line-height:1.6}
   .sh-ref p{margin:0}
   .sh-ref b{font-family:var(--pop); font-weight:400; font-size:20px}
@@ -618,6 +625,7 @@
     <header class="sh-head">
       <p class="sh-grp" id="sh-grp"></p>
       <h2 class="sh-what" id="sh-what" tabindex="-1"></h2>
+      <div class="sh-cp" id="sh-cp"></div>
       <p class="sh-now" id="sh-now"></p>
     </header>
     <div class="sh-ref" id="sh-ref"></div>
@@ -1710,6 +1718,39 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       else put(stockNote, reason("connect"));
     });
   }
+  // ---- 番号をコピー（2026-10-10 本人「op17-037 R とかあるけど…これコピペできるように機能追加して」）----
+  //   番号＝パソコンが作品の決まりの型番で名前から取り出して it.code で送る。★1枚ずつの通し番号ではない（普通の版とパラレル・同じカードの2枚目は同じ番号）＝フリマで探す時の言葉
+  function copyText(s) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(s).catch(function () { return oldCopy(s); });
+    return oldCopy(s);
+  }
+  function oldCopy(s) {   // クリップボードの道具が使えないブラウザ向け（隠した入力欄を選んでコピー）
+    return new Promise(function (ok, ng) {
+      var ta = document.createElement("textarea"), done = false;
+      ta.value = s;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed; top:-1000px; left:0; opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { done = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      if (done) ok(); else ng(new Error("copy"));
+    });
+  }
+  function codeBtn(code) {
+    var b = el("button", "cp"), t = null;
+    b.type = "button";
+    b.setAttribute("aria-label", "番号 " + code + " をコピー");
+    function show(msg, st) { b.textContent = ""; b.appendChild(el("b", "", code)); b.appendChild(document.createTextNode(" " + msg)); b.setAttribute("data-done", st); }
+    show("をコピー", "0");
+    b.addEventListener("click", function () {
+      clearTimeout(t);
+      copyText(code).then(function () { show("コピーしました", "1"); }, function () { show("コピーできませんでした", "2"); }).then(function () {
+        t = setTimeout(function () { show("をコピー", "0"); }, 2000);
+      });
+    });
+    return b;
+  }
   function renderStock() {
     stockBox.textContent = "";
     renderHome();
@@ -1783,6 +1824,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
         li.setAttribute("data-state", it.state);
         li.appendChild(el("span", "lab", it.label));
         body.appendChild(segs(el("p", "what"), it.what));
+        if (it.code) body.appendChild(codeBtn(it.code));   // 番号をコピー（2026-10-10）
         var doneSale = it.state === "売れた" && it.sale && it.sale.done;   // 取引完了の印＝収支表で入金まで済んだ売上（2026-09-15）
         var chip = el("span", "chip", doneSale ? "取引完了" : (CHIP[it.state] || it.state));
         chip.setAttribute("data-state", doneSale ? "取引完了" : it.state);
@@ -2612,6 +2654,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     put(shGrp, [g.name]);
     shWhat.textContent = "";
     segs(shWhat, it.label + "　" + it.what);
+    byId("sh-cp").textContent = "";
+    if (it.code) byId("sh-cp").appendChild(codeBtn(it.code));   // 番号をコピー（2026-10-10）
     put(shNow, listed ? ["いまの値段：", it.price || "–", "（" + String(it.where || "").replace(/[✅*]/g, "") + "）"] : ["手元に" + (it.count || 0) + "枚", "・まだ出していない"]);
     shRef.textContent = "";
     var near = nearOf(r), has = !!(r && r.中央値);
