@@ -1950,7 +1950,10 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   function nearOf(r) { return r && r.近い物 && r.近い物.中央値 ? r.近い物 : null; }
   function nearWhy(n) { var j = String((n && n.判定) || ""); return j.indexOf("まだ混ざって") === 0 ? "（値段の幅が広い＝絵柄やレア度で大きく違う）" : j.indexOf("少ない") === 0 ? "（売れた例が少ない）" : ""; }
   function refWhy(j) { j = String(j || ""); return j.indexOf("少ない") === 0 ? "売れた例が少ない（5件未満）ので、目安です" : j.indexOf("まだ混ざって") === 0 ? "別の絵柄が混ざっているかもしれません" : j; }
+  // お店の販売価格で出す品物（r.店＝店の名前）＝ワンピはメルカリの出品名でパラレルかどうかが分からず別の版が混ざる（2026-10-10 シャンクスの通常版に¥7,777）
+  function shopOf(r) { return r && r.店 && r.中央値 ? r : null; }
   function refLine(r) {
+    if (shopOf(r)) return "お店 " + yen(r.中央値) + "（" + r.店 + "）";
     if (r && r.中央値) return "参考 " + yen(r.中央値) + "（" + r.件数 + "件" + (usable(r) ? "" : String(r.判定 || "").indexOf("少ない") === 0 ? "・少なめ" : "・混ざりあり") + "）";
     var n = nearOf(r);
     return n ? "同じキャラ " + yen(n.中央値) + "（" + n.件数 + "件）" : "";
@@ -2602,7 +2605,14 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     put(shNow, listed ? ["いまの値段：", it.price || "–", "（" + String(it.where || "").replace(/[✅*]/g, "") + "）"] : ["手元に" + (it.count || 0) + "枚", "・まだ出していない"]);
     shRef.textContent = "";
     var near = nearOf(r), has = !!(r && r.中央値);
-    if (has) {
+    if (shopOf(r)) {
+      shRef.appendChild(segs(el("p", ""), "参考（お店の販売価格＝" + r.店 + (r.版 ? "・" + r.版 : "") + "）"));
+      var sp = el("p", "ref-num");
+      sp.appendChild(el("b", "", yen(r.中央値)));
+      if (r.買取) sp.appendChild(document.createTextNode("　お店の買取 " + yen(r.買取)));
+      shRef.appendChild(sp);
+      shRef.appendChild(segs(el("p", "small"), "※メルカリは版が混ざるため、お店の値段です　調べた日：" + when(r.調べた)));
+    } else if (has) {
       shRef.appendChild(segs(el("p", ""), "参考（メルカリで売れた値段の真ん中）"));
       shRef.appendChild(refNums(r));
       shRef.appendChild(segs(el("p", "small"), (usable(r) ? (r.判定 !== "OK" ? "※" + r.判定 + "　" : "") : "※" + refWhy(r.判定) + "　") + "調べた日：" + when(r.調べた)));
