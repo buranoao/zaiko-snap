@@ -1239,6 +1239,13 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var HIST_KEY = "zaikoSnap.hist.v1", hist = loadHist(), PC_ON = null, LAST_PENDING = null;
   var CANCEL_PHOTO = false;   // 受け口が「送った写真の取り消し」を知っている版か（返事の cancelPhoto の印・2026-10-17）＝古い受け口にはボタンを出さない
   var SHOT_CANCEL = {};       // 取り消しを押した後の様子（一覧は1分おきなどに描き直す＝描き直しても「取り消しています…」や断られた理由を消さない）
+  // 取り消した写真を一覧に出しておく時間（2026-10-17 本人「3時間くらいでいいんじゃない？…何消したかくらいだよね？」）
+  //   ＝取り消しが効いたかと、何を取り消したかが分かれば足りる。★記録（hist）からは消さない＝撮り直しのお願いが「送り済み」に化けないように、見せ方だけ外す
+  var CANCEL_SHOW_MS = 3 * 3600000;
+  function shownHist() {
+    var now = Date.now();
+    return hist.filter(function (h) { return !(h.state === "取消" && now - (h.cAt || h.at || 0) > CANCEL_SHOW_MS); });
+  }
   function loadHist() {
     try { var h = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); return Array.isArray(h) ? h : []; } catch (e) { return []; }
   }
@@ -1273,7 +1280,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var SHOW_ALL = false;
   function renderShots() {
     shotsEl.textContent = "";
-    var all = hist.slice(0, 30), show = SHOW_ALL ? all : all.slice(0, 5);
+    var all = shownHist().slice(0, 30), show = SHOW_ALL ? all : all.slice(0, 5);
     list.hidden = !all.length;
     // 閉じた見出し＝枚数と行方の数。届いていない写真は赤で出す＝閉じたままでも困った写真があると分かる（2026-09-25）
     var nOk = 0, nOff = 0, nNow = 0, nBad = 0, nCan = 0;
@@ -1366,7 +1373,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     api("cancelphoto", { uid: h.uid }, 35000, 2).then(function () {   // 受け口は鍵を30秒まで待つ＝それより長く待つ
       delete SHOT_CANCEL[h.uid];
       forget(h.uid);   // スマホに残した控えも消す（開き直した時に送り直さない）
-      mark(h.uid, { state: "取消" });
+      mark(h.uid, { state: "取消", cAt: Date.now() });
       refresh();   // 「見分け待ちの写真」の数を減らす
     }, function (e) {
       var code = e && e.code;
@@ -1539,6 +1546,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
           delete SHOT_CANCEL[u];
           forget(u);
           h.state = "取消";
+          if (!h.cAt) h.cAt = Date.now();
           changed = true;
           return;
         }
