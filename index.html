@@ -194,6 +194,8 @@
   .ssub .ph{max-width:100%; overflow-wrap:anywhere}
   .swhen{margin:3px 0 0; font-family:var(--mono); font-size:13px; color:var(--muted)}
   .more{width:100%; min-height:48px; border-radius:10px; border:1px solid var(--rule); background:var(--card); color:var(--accent); font:700 15px/1.4 var(--gothic); cursor:pointer}
+  .scancel{margin-top:8px; min-height:44px; padding:8px 18px; border-radius:10px; border:2px solid var(--ink); background:var(--card); color:var(--alert); font:700 15px/1.4 var(--gothic); cursor:pointer}   /* 見分け待ちの写真を取り消す（2026-10-17） */
+  .scancel:disabled{color:var(--muted); cursor:default}
   .todo button[data-hot="1"]{background:var(--card); border-color:var(--rule); box-shadow:inset 6px 0 0 var(--warn)}
   details.tips summary{cursor:pointer; font-family:var(--mincho); font-weight:600; font-size:18px}
   /* ==== ポップな見た目（2026-09-13）：空と草原・太い黒ふち・ずらした影。字は白い札の上 ==== */
@@ -879,7 +881,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var prevCleared = false;
   var HARD = ["not_allowed", "too_large", "too_late", "bad_price", "no_channel", "bad_order", "no_order", "old_server", "already", "bad_store",
               "not_waiting", "closed", "canceled",   // 2026-09-29 値段を直す：準備が始まった・済んだ・取り消した＝送り直しても変わらない
-              "bad_kind"];   // 2026-09-29 別の目：古い受け口が知らない種類＝「古い版です」と出す（無いと送り直しの末に「送れませんでした」に化けていた）
+              "bad_kind",   // 2026-09-29 別の目：古い受け口が知らない種類＝「古い版です」と出す（無いと送り直しの末に「送れませんでした」に化けていた）
+              "already_done", "not_found"];   // 2026-10-17 写真の取り消し：もう在庫に入っていた・受け口に無い＝送り直しても変わらない
   // Googleのログイン状態に左右されないよう、Cookieを付けずに送る
   function apiOnce(op, extra, ms, sendOnly) {
     var body = { k: CFG.k, op: op };
@@ -1085,6 +1088,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       nWait.textContent = String(s.pending);
       nDone.textContent = String(s.done);
       LAST_PENDING = Number(s.pending) || 0;
+      if (s.cancelPhoto === true) CANCEL_PHOTO = true;
       if (s.pcSeen !== undefined) setPc(s.pcSeen, s.now);
       renderHome();
       setStatus("ok", ["写真を", "送れます"]);
@@ -1233,6 +1237,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
 
   // ---- 送った写真の記録（この端末に残す）：写真ごとに 受付→届いた→見分け→在庫 を見せる ----
   var HIST_KEY = "zaikoSnap.hist.v1", hist = loadHist(), PC_ON = null, LAST_PENDING = null;
+  var CANCEL_PHOTO = false;   // 受け口が「送った写真の取り消し」を知っている版か（返事の cancelPhoto の印・2026-10-17）＝古い受け口にはボタンを出さない
+  var SHOT_CANCEL = {};       // 取り消しを押した後の様子（一覧は1分おきなどに描き直す＝描き直しても「取り消しています…」や断られた理由を消さない）
   function loadHist() {
     try { var h = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); return Array.isArray(h) ? h : []; } catch (e) { return []; }
   }
@@ -1270,10 +1276,11 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     var all = hist.slice(0, 30), show = SHOW_ALL ? all : all.slice(0, 5);
     list.hidden = !all.length;
     // 閉じた見出し＝枚数と行方の数。届いていない写真は赤で出す＝閉じたままでも困った写真があると分かる（2026-09-25）
-    var nOk = 0, nOff = 0, nNow = 0, nBad = 0;
+    var nOk = 0, nOff = 0, nNow = 0, nBad = 0, nCan = 0;
     all.forEach(function (h) {
       var s = h.state || "受付";
       if (s === "在庫") { if (inStock(h.label)) nOk += 1; else nOff += 1; }   // 外した品も数える＝内訳の合計が枚数と合う（別の目 2026-09-25）
+      else if (s === "取消") nCan += 1;
       else if (s === "届かず" || s === "待ち" || s === "bad") nBad += 1;
       else nNow += 1;
     });
@@ -1281,6 +1288,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     shotsSum.appendChild(el("span", "grp-n", all.length + "枚"));
     if (nOk) shotsSum.appendChild(el("span", "", "在庫に入った " + nOk));
     if (nOff) shotsSum.appendChild(el("span", "", "在庫から外した " + nOff));
+    if (nCan) shotsSum.appendChild(el("span", "", "取り消した " + nCan));
     if (nNow) shotsSum.appendChild(el("span", "", "途中 " + nNow));
     if (nBad) shotsSum.appendChild(el("span", "hot", "届いていない " + nBad));
     show.forEach(function (h) {
@@ -1296,6 +1304,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
         if (PC_ON === false) { main = "届きました"; sub = "パソコンのClaudeが止まっています。動いた時に在庫へ入ります"; }
         else main = "届きました（見分け中）";
       }
+      else if (st === "取消") { kind = "off"; main = "取り消しました"; sub = "在庫には入りません。間違えた時は、もう一度写真を送ってください"; }
       else if (st === "確かめ中") { kind = "now"; main = "届いたか確かめています"; sub = SAFE ? "届いたと分かるまで、写真はスマホに残します" : "送り終わるまで、この画面を閉じないでください"; }
       else if (st === "届かず") { kind = "bad"; main = "届いていません"; sub = "「いますぐ送り直す」を押すと、もう一度送ります"; }
       else if (st === "待ち") { kind = "bad"; main = "電波待ち"; sub = "電波が戻ったら、自動で送り直します"; }
@@ -1318,6 +1327,16 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       if (sub) box.appendChild(segs(el("p", "ssub"), sub));
       var d = new Date(h.at || Date.now());
       box.appendChild(el("p", "swhen", (d.getMonth() + 1) + "月" + d.getDate() + "日 " + pad(d.getHours()) + ":" + pad(d.getMinutes())));
+      // 間違えて送った写真を取り消す（2026-10-17 本人「間違って送信しちゃったので取り消しボタンつけたい（届きました（見分け中）って時に）」）
+      //   ＝在庫に入る前（見分け待ち）だけ。受け口が知っている版（cancelPhoto の印）の時だけ出す
+      if (st === "届いた" && CANCEL_PHOTO) {
+        var cs = SHOT_CANCEL[h.uid] || {};
+        var cb = segs(el("button", "scancel"), cs.busy ? "取り消しています…" : cs.ask ? "本当に取り消す（もう一度押す）" : (cs.msg || "取り消す"));
+        cb.type = "button";
+        cb.disabled = !!(cs.busy || cs.off);
+        cb.addEventListener("click", function () { cancelShot(h); });
+        box.appendChild(cb);
+      }
       li.appendChild(box);
       shotsEl.appendChild(li);
     });
@@ -1329,6 +1348,34 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       li2.appendChild(more);
       shotsEl.appendChild(li2);
     }
+  }
+
+  // 見分け待ちの写真を取り消す（2026-10-17）。受け口は写真を消さずに「取り消し（スマホ）」へ移す＝パソコンはもう拾わない
+  function cancelShot(h) {
+    var cs = SHOT_CANCEL[h.uid] || {};
+    if (cs.busy) return;
+    if (!cs.ask) {
+      // ★1回目は聞くだけ＝押し間違いで正しい写真を取り消さない（2026-10-17 別の目）。6秒たつと元の「取り消す」に戻る
+      SHOT_CANCEL[h.uid] = { ask: true };
+      renderShots();
+      setTimeout(function () { var c = SHOT_CANCEL[h.uid]; if (c && c.ask) { delete SHOT_CANCEL[h.uid]; renderShots(); } }, 6000);
+      return;
+    }
+    SHOT_CANCEL[h.uid] = { busy: true };
+    renderShots();
+    api("cancelphoto", { uid: h.uid }, 35000, 2).then(function () {   // 受け口は鍵を30秒まで待つ＝それより長く待つ
+      delete SHOT_CANCEL[h.uid];
+      forget(h.uid);   // スマホに残した控えも消す（開き直した時に送り直さない）
+      mark(h.uid, { state: "取消" });
+      refresh();   // 「見分け待ちの写真」の数を減らす
+    }, function (e) {
+      var code = e && e.code;
+      SHOT_CANCEL[h.uid] = code === "already_done" ? { msg: "もう在庫に入っていました（外す時はClaudeに伝えてください）", off: true }
+        : code === "not_found" ? { msg: "受け口に見つかりませんでした（Claudeに伝えてください）", off: true }
+        : { msg: "取り消せませんでした（もう一度押す）" };
+      renderShots();
+      if (code === "already_done") track();   // 在庫に入った姿（ラベル）に描き直す
+    });
   }
 
   function enqueue(items) {
@@ -1478,11 +1525,23 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     trackBusy = true;
     api("track", { uids: uids }, 20000, 2).then(function (j) {
       trackBusy = false;
+      if (j.cancelPhoto === true) CANCEL_PHOTO = true;
       if (j.pcSeen !== undefined) setPc(j.pcSeen, j.now);
       var items = j.items || {}, changed = false, again = [];
       Object.keys(items).forEach(function (u) {
         var it = items[u], h = histOf(u);
         if (!h || h.state === "在庫") return;
+        if (h.state === "取消" && it.state !== "cancelled" && it.state !== "done") return;   // 取り消す前に出した問い合わせの返事が後から届いても「届いた」に戻さない（2026-10-17 別の目）
+        if (it.state === "cancelled") {
+          // 取り消した写真（押した返事を取りこぼした時も、ここで「取り消しました」に直る・2026-10-17）
+          failed = failed.filter(function (q) { return q.uid !== u; });
+          delete checking[u];
+          delete SHOT_CANCEL[u];
+          forget(u);
+          h.state = "取消";
+          changed = true;
+          return;
+        }
         if (it.state === "none") {
           // 確かめ中の写真が受け口に無い：「無い」が10分続いたら、同じ受付番号で送り直す（受け口は受付番号で二重を防ぐ）。自動は1枚3回まで
           if (h.state !== "確かめ中" || !checking[u]) return;
@@ -2250,7 +2309,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     var uids = (v && v.uids) || [];
     if (!uids.length) return { t: t, sending: false };
     var hs = uids.map(histOf);
-    if (hs.every(function (h) { return h && h.state === "bad"; })) return null;
+    if (hs.every(function (h) { return h && (h.state === "bad" || h.state === "取消"); })) return null;   // 取り消した撮り直しの写真も「送れなかった」と同じ＝お願いを出し直す（2026-10-17）
     return { t: t, sending: !hs.some(function (h) { return !h || h.state === "届いた" || h.state === "在庫"; }) };   // 記録が消えた古い写真は届いた扱い
   }
   function rtSent(r) { var i = rtSentInfo(r); return i ? i.t : 0; }
