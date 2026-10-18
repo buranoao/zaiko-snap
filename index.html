@@ -290,7 +290,7 @@
   .filter button{border:3px solid var(--ink); box-shadow:3px 3px 0 var(--ink); border-radius:12px; font-weight:700; background:var(--card); color:var(--ink)}
   .filter button[aria-pressed="true"]{background:var(--pink); color:var(--ink); box-shadow:1px 1px 0 var(--ink); transform:translate(2px,2px)}
   .find-row{background:var(--card); border:3px solid var(--ink); border-radius:16px; box-shadow:var(--shadow); padding:10px 14px}
-  #pane-stock > .note{background:var(--card); border:2px solid var(--ink); border-radius:12px; padding:8px 12px; color:var(--ink)}
+  #pane-stock > .note, #shots-note{background:var(--card); border:2px solid var(--ink); border-radius:12px; padding:8px 12px; color:var(--ink)}   /* 送った写真の説明も枠に入れる＝背景の丘の線が文字に重なった（2026-10-18） */
   .grp{background:var(--card); border:3px solid var(--ink); border-radius:18px; box-shadow:var(--shadow); padding:12px}
   .grp-h{border-bottom:2px dashed var(--ink)}
   .grp-h > span:first-child{font-family:var(--pop); font-weight:400}
@@ -403,6 +403,20 @@
   #cd-picks .pick{flex-wrap:wrap; align-content:center}   /* 「もう1枚」「カメラで撮る」を2行に折る（はみ出さない） */
   .sh-close.cd-send{background:var(--pink); font-family:var(--pop); font-weight:400; font-size:19px}   /* .sh-close（白）より後ろで勝つように2つ重ねる */
   .sh-close.cd-send:disabled{opacity:.45; box-shadow:none}
+  /* ---- まとめて選んだ写真を長押しで重ねる（2026-10-17）＝重ねた束が1つの出品・重ねなければ1枚ずつ別の品物 ---- */
+  .gp-piles{list-style:none; margin:0; padding:10px 10px 4px 8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px 16px; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none}
+  @media (min-width:520px){ .gp-piles{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  .gp-pile{display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; cursor:grab}
+  .gp-th{position:relative; width:100%; aspect-ratio:63 / 88; border:3px solid var(--ink); border-radius:10px; background:#fff; box-sizing:border-box; transition:transform .12s}
+  .gp-th img{display:block; width:100%; height:100%; object-fit:cover; border-radius:7px; pointer-events:none; -webkit-user-drag:none}
+  .gp-multi .gp-th{box-shadow:5px 5px 0 -2px #fff, 5px 5px 0 1px var(--ink), 10px 10px 0 -2px #fff, 10px 10px 0 1px var(--ink)}   /* 後ろに2枚重なった束に見せる */
+  .gp-n{position:absolute; top:-10px; left:-8px; padding:0 8px; border:2px solid var(--ink); border-radius:999px; background:var(--pink); color:var(--ink); font-size:14px; font-weight:700; line-height:1.7}
+  .gp-lab{margin:6px 0 0; font-size:15px; font-weight:700; text-align:center; line-height:1.4}
+  .gp-split{min-height:44px; padding:0 14px; border:3px solid var(--ink); border-radius:12px; background:var(--card); color:var(--ink); font:700 15px/1 var(--gothic); box-shadow:2px 2px 0 var(--ink); cursor:pointer}   /* 指で押せる大きさ（44px） */
+  .gp-split:active{transform:translate(2px,2px); box-shadow:none}
+  .gp-lifted .gp-th{opacity:.3}
+  .gp-over .gp-th{outline:4px solid var(--pink); outline-offset:4px; transform:scale(1.05)}
+  .gp-ghost{position:fixed; z-index:80; margin:0; pointer-events:none; transform:translate(-50%,-55%) rotate(-5deg) scale(1.06); box-shadow:6px 6px 0 var(--ink); opacity:.95}
   .sh-close.cd-next{background:var(--sun); font-family:var(--pop); font-weight:400; font-size:19px}
   .ref{font-weight:700; color:var(--ink)}
   .sh-ref hr.ref-sep{border:0; border-top:2px dashed var(--muted); margin:8px 0 6px}   /* その品物の数字と、同じキャラの1枚売りの数字を分ける（2026-09-15） */
@@ -546,7 +560,7 @@
     </div>
     <input type="file" id="file" accept="image/*" multiple>
     <label class="pick" for="file">写真を撮る・選ぶ</label>
-    <p>その場で<wbr>撮っても、<wbr>アルバムから<wbr>選んでも。<br>何枚<wbr>まとめてでも<wbr>大丈夫です。</p>
+    <p>その場で<wbr>撮っても、<wbr>アルバムから<wbr>選んでも。<br>何枚<wbr>まとめてでも<wbr>大丈夫です。<br>2枚以上<wbr>選ぶと、<wbr>送る前に<wbr>セットを<wbr><span class="ph">重ねる画面が出ます。</span></p>
     <button class="pick pick-card" id="card-pick" type="button"><span class="cd-main"><span class="ph">カードを</span><span class="ph">撮って送る</span></span><span class="cd-sub">写真1〜5枚</span></button>
     <p>ポケカ・<wbr>ワンピなどの<wbr>カードは<wbr>こちら。<br>1枚の<wbr>カードを、<wbr>写真1〜5枚で<wbr>送れます<wbr><span class="ph">（表・裏・</span><wbr><span class="ph">傷のアップなど）。</span></p>
   </section>
@@ -556,6 +570,8 @@
 
   <section class="list" id="list" hidden>
     <h2>送った写真</h2>
+    <!-- 記録はこの端末に残す（hist）＝スマホとパソコンで中身が違う。説明が無いと食い違いに見える（2026-10-18 本人「パソコンとスマートフォンで表示の食い違いが見つかってる」→「1」） -->
+    <p class="note" id="shots-note">この端末から<wbr>送った写真だけ<wbr>出ます。<wbr>ほかのスマホや<wbr>パソコンから<wbr>送った写真は、<wbr><span class="ph">そちらに出ます。</span></p>
     <!-- 送った写真は増えていくので、ふだんは閉じる（2026-09-25 本人「増えていったら邪魔になると思うのでプルダウン形式で」）。閉じた見出しに枚数と行方の数を出す -->
     <details class="grp shots-grp" id="shots-grp">
       <summary class="grp-h"><span class="grp-row"><span class="grp-sub" id="shots-sum"></span><span class="grp-tg" id="shots-tg">ひらく ▼</span></span></summary>
@@ -798,6 +814,24 @@
       <button type="button" class="sh-close" id="cd-close">閉じる</button>
     </div>
     <p class="sh-foot">1枚目は、<wbr>在庫の一覧に<wbr>出る写真です<wbr>（表がおすすめ）。<wbr>2枚目からは<wbr>自由です<wbr><span class="ph">（裏・スリーブ入り・</span><wbr><span class="ph">傷のアップなど）。</span><wbr>「この◯枚で送る」を<wbr>押すまでは<wbr>送りません。</p>
+  </section>
+</div>
+
+<!-- まとめて選んだ写真を、長押しで重ねて「1つの出品」にする（2026-10-17 本人「長押しで重ねたらそれがセットって意味にする方がUI・UX的に良くない？」→「1」） -->
+<div class="sheet-back" id="gpsheet" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="gp-title">
+    <header class="sh-head">
+      <p class="sh-grp">まとめて選んだ写真</p>
+      <h2 class="sh-what" id="gp-title" tabindex="-1">セットは重ねてから送る</h2>
+    </header>
+    <p class="cd-lead"><span class="ph">同じ出品の写真は、</span><span class="ph">長押しして、</span><span class="ph">ほかの写真の上に</span><span class="ph">重ねてください。</span><span class="ph">重ねなければ、</span><span class="ph">1枚ずつ</span><span class="ph">別の品物として</span><span class="ph">送ります。</span></p>
+    <ol class="gp-piles" id="gp-piles" aria-label="選んだ写真"></ol>
+    <p class="rt-msg" id="gp-msg" role="status" hidden></p>
+    <div class="sh-acts st-acts">
+      <button type="button" class="sh-close cd-send" id="gp-send">送る</button>
+      <button type="button" class="sh-close" id="gp-close">やめる（送りません）</button>
+    </div>
+    <p class="sh-foot">重ねた先の写真が、<wbr>在庫の一覧に<wbr>出る写真です。<wbr><span class="ph">束の「ばらす」で</span><wbr>元に戻せます。<wbr>「送る」を<wbr>押すまでは<wbr>送りません。</p>
   </section>
 </div>
 
@@ -1520,6 +1554,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     var picked = Array.prototype.slice.call(fileInput.files || []).filter(function (f) { return f && f.size > 0; });
     fileInput.value = "";
     if (picked.length) memoInput.value = "";   // ★メモは選んだ写真にだけ付ける＝次に選ぶ写真に前のメモが付いていた（2026-09-16 点検その3）
+    if (picked.length > 1) return openGp(picked, memo);   // 2枚以上＝送る前に、長押しでセットを重ねられるシート（2026-10-17）
     enqueue(picked.map(function (f) { return { file: f, memo: memo }; }));
   });
 
@@ -2388,7 +2423,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   function closeRetake() {
     byId("rtsheet").hidden = true;
     RT = null;
-    if (sheet.hidden && stopSheet.hidden && byId("cdsheet").hidden) document.body.classList.remove("sheet-open");
+    if (sheet.hidden && stopSheet.hidden && byId("cdsheet").hidden && byId("gpsheet").hidden) document.body.classList.remove("sheet-open");
   }
   function sendRetake(input) {
     var r = RT, picked = Array.prototype.slice.call(input.files || []).filter(function (f) { return f && f.size > 0; }).slice(0, 1);   // ★1枚だけ＝アルバムで何枚も選ぶと、別の品物の写真まで「差し替え」（数えない）になった（2026-09-16 点検その3）
@@ -2478,7 +2513,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     if (CD) CD.shots.forEach(cdForget);
     CD = null;
     byId("cd-shots").textContent = "";
-    if (sheet.hidden && stopSheet.hidden && byId("rtsheet").hidden) document.body.classList.remove("sheet-open");
+    if (sheet.hidden && stopSheet.hidden && byId("rtsheet").hidden && byId("gpsheet").hidden) document.body.classList.remove("sheet-open");
   }
   function cdUnsent() { return !!(CD && !CD.sent && CD.shots.length); }
   function sameFile(a, b) { return !!(a && b) && a.name === b.name && a.size === b.size && a.lastModified === b.lastModified; }
@@ -2518,6 +2553,151 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     cdMemo.value = "";
     cdRender();
     cdSay([M + "枚を", "送っています。", "1枚のカードとして", "数えます。", "届いたかは", "「送った写真」で", "分かります。"]);
+  }
+  // ---- まとめて選んだ写真を、長押しで重ねて「1つの出品」にする（2026-10-17 本人「これが同一の出品だよみたいな判明できる機能工夫できない？」
+  //   →「長押しで重ねたらそれがセットって意味にする方がUI・UX的に良くない？」→「1」）----
+  //   普通の入口で2枚以上選んだ時だけ、送る前にこのシートを出す（1枚ならこれまでどおりすぐ送る）。
+  //   写真を長押し（0.45秒）して、別の写真の上で指を離すと、その束に重なる（重ねた先の1枚目＝在庫の一覧の顔）。「ばらす」で元に戻る。重ねなければ1枚ずつ別の品物。
+  //   束の写真のメモに「［同じ出品］［カード N/M 組=<1枚目の受付番号>］」＝パソコンの在庫写真を取る.py がカードと同じ組として扱い、組の写真を全部見て現物を数える。★形を変えたら向こうの SAME_MARK も直す
+  //   ★長押しは0.45秒（別の目 2026-10-17＝0.35秒だと、ゆっくり画面を動かし始めた指が止まった時に持ち上がりやすい・60代の指）
+  var GP = null, GP_MAX = 10, GP_HOLD = 450;   // GP＝{ piles: [[{ file, url }]], memo, sent }／1つの出品は10枚まで（Yahoo!フリマの写真の上限）
+  var gpDrag = null;   // 長押しの途中・重ねている途中＝{ from, id, x, y, x0, y0, live, timer, ghost, over }
+  var gpBox = byId("gp-piles");
+  function gpCount() { var n = 0; (GP ? GP.piles : []).forEach(function (p) { n += p.length; }); return n; }
+  function gpSay(parts) { var msg = byId("gp-msg"); if (!parts) { msg.hidden = true; return; } put(msg, parts); msg.hidden = false; }
+  function gpRender() {
+    gpBox.textContent = "";
+    if (!GP) return;
+    GP.piles.forEach(function (pile, i) {
+      var multi = pile.length > 1, li = el("li", "gp-pile" + (multi ? " gp-multi" : "")), th = el("div", "gp-th"), lab = el("p", "gp-lab");
+      li.setAttribute("data-i", String(i));
+      var im = document.createElement("img");
+      im.alt = multi ? "1つの出品（" + pile.length + "枚）の1枚目" : (i + 1) + "番目の写真";
+      im.draggable = false;
+      if (pile[0].url) im.src = pile[0].url;
+      th.appendChild(im);
+      if (multi) th.appendChild(el("span", "gp-n", pile.length + "枚"));
+      li.appendChild(th);
+      put(lab, multi ? ["1つの出品", "（" + pile.length + "枚）"] : ["1枚"]);
+      li.appendChild(lab);
+      if (multi) {
+        var sp = el("button", "gp-split", "ばらす");
+        sp.type = "button";
+        sp.setAttribute("aria-label", "この束をばらす（" + pile.length + "枚）");
+        sp.addEventListener("click", function () { gpSplit(i); });
+        li.appendChild(sp);
+      }
+      gpBox.appendChild(li);
+    });
+    var go = byId("gp-send");
+    go.textContent = GP.piles.length + "品（写真" + gpCount() + "枚）を送る";
+    go.disabled = GP.sent;
+  }
+  function gpMerge(from, to) {
+    if (!GP || GP.sent || from === to || !GP.piles[from] || !GP.piles[to]) return gpRender();
+    var a = GP.piles[from], b = GP.piles[to];
+    if (a.length + b.length > GP_MAX) { gpRender(); return gpSay(["1つの出品は", GP_MAX + "枚まで", "です。"]); }
+    GP.piles[to] = b.concat(a);   // 重ねた先の写真が前（1枚目＝一覧の顔）
+    GP.piles.splice(from, 1);
+    gpRender();
+    gpSay(["重ねました。", "1つの出品", "（" + (a.length + b.length) + "枚）", "として送ります。"]);
+  }
+  function gpSplit(i) {
+    if (!GP || GP.sent || !GP.piles[i] || GP.piles[i].length < 2) return;
+    var pile = GP.piles[i];
+    Array.prototype.splice.apply(GP.piles, [i, 1].concat(pile.map(function (s) { return [s]; })));
+    gpRender();
+    gpSay(["ばらしました。", "1枚ずつ", "別の品物として", "送ります。"]);
+  }
+  function gpPileAt(x, y) {
+    var t = document.elementFromPoint(x, y), li = t && t.closest ? t.closest(".gp-pile") : null;
+    return li && gpBox.contains(li) ? Number(li.getAttribute("data-i")) : -1;
+  }
+  function gpMove(x, y) {
+    var d = gpDrag;
+    d.x = x;
+    d.y = y;
+    d.ghost.style.left = x + "px";
+    d.ghost.style.top = y + "px";
+    var over = gpPileAt(x, y);
+    if (over === d.from) over = -1;
+    if (over === d.over) return;
+    var old = gpBox.querySelector(".gp-over");
+    if (old) old.classList.remove("gp-over");
+    if (over >= 0) { var li = gpBox.querySelector('.gp-pile[data-i="' + over + '"]'); if (li) li.classList.add("gp-over"); }
+    d.over = over;
+  }
+  function gpScroll() {   // 重ねている間、指がシートの上下の端に来たら少しずつ動かす（写真が多くて1画面に入りきらない時）
+    if (!gpDrag || !gpDrag.live) return;
+    var sc = byId("gpsheet").querySelector(".sheet"), r = sc.getBoundingClientRect(), bar = sc.querySelector(".sh-acts"), bottom = bar ? bar.getBoundingClientRect().top : r.bottom, y = gpDrag.y, top = sc.scrollTop, EDGE = 60;
+    // 端に近いほど速く（1こまで最大6px）＝端の手前で持ち上げても急に流れない（別の目 2026-10-17）
+    if (y < r.top + EDGE) sc.scrollTop -= Math.ceil(6 * Math.min(1, (r.top + EDGE - y) / EDGE));
+    else if (y > bottom - EDGE) sc.scrollTop += Math.ceil(6 * Math.min(1, (y - bottom + EDGE) / EDGE));
+    if (sc.scrollTop !== top) gpMove(gpDrag.x, gpDrag.y);
+    requestAnimationFrame(gpScroll);
+  }
+  function gpLift() {
+    var d = gpDrag, li = d && gpBox.querySelector('.gp-pile[data-i="' + d.from + '"]');
+    if (!li) { gpDrag = null; return; }
+    var th = li.querySelector(".gp-th"), r = th.getBoundingClientRect(), g = th.cloneNode(true);
+    g.className = "gp-th gp-ghost";
+    g.style.width = r.width + "px";
+    g.style.height = r.height + "px";
+    document.body.appendChild(g);
+    d.live = true;
+    d.ghost = g;
+    li.classList.add("gp-lifted");
+    gpSay(["ほかの写真の上で", "指を離すと", "重なります。"]);
+    gpMove(d.x, d.y);
+    try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {}   // 持ち上がった合図（Android）
+    gpScroll();
+  }
+  function gpEnd(drop) {
+    var d = gpDrag;
+    gpDrag = null;
+    if (!d) return;
+    clearTimeout(d.timer);
+    if (!d.live) {
+      if (drop) gpSay(["長押ししてから、", "ほかの写真の上で", "指を離すと", "重なります。"]);   // 押しただけ＝やり方を言う
+      return;
+    }
+    if (d.ghost && d.ghost.parentNode) d.ghost.parentNode.removeChild(d.ghost);
+    if (drop && d.over >= 0) return gpMerge(d.from, d.over);
+    gpRender();
+    gpSay(null);
+  }
+  function openGp(files, memo) {
+    if (GP) GP.piles.forEach(function (p) { p.forEach(cdForget); });
+    GP = { piles: files.map(function (f) { var url = ""; try { url = URL.createObjectURL(f); } catch (e) {} return [{ file: f, url: url }]; }), memo: memo, sent: false };
+    gpRender();
+    gpSay(null);
+    byId("gpsheet").hidden = false;
+    document.body.classList.add("sheet-open");
+    try { byId("gp-title").focus({ preventScroll: true }); } catch (e) {}
+  }
+  function closeGp() {
+    if (gpDrag) gpEnd(false);
+    byId("gpsheet").hidden = true;
+    if (GP) {
+      if (!GP.sent && GP.memo && !memoInput.value) memoInput.value = GP.memo;   // やめた時は、書いたメモを送る画面に戻す
+      GP.piles.forEach(function (p) { p.forEach(cdForget); });
+    }
+    GP = null;
+    gpBox.textContent = "";
+    if (sheet.hidden && stopSheet.hidden && byId("rtsheet").hidden && byId("cdsheet").hidden) document.body.classList.remove("sheet-open");
+  }
+  function gpSend() {
+    if (!GP || GP.sent || !GP.piles.length) return;
+    var memo = GP.memo, m = memo ? memo + " " : "", items = [], used = {};
+    function uid() { var u; do { u = makeUid(); } while (used[u]); used[u] = 1; return u; }
+    GP.piles.forEach(function (pile) {
+      if (pile.length === 1) { items.push({ file: pile[0].file, memo: memo }); return; }
+      var uids = pile.map(uid);
+      pile.forEach(function (s, i) { items.push({ file: s.file, memo: m + "［同じ出品］［カード " + (i + 1) + "/" + pile.length + " 組=" + uids[0] + "］", uid: uids[i] }); });
+    });
+    GP.sent = true;   // 先に立てる＝2度押しでも1回だけ送る
+    enqueue(items);
+    closeGp();
   }
   function closeStop() {
     stopSheet.hidden = true;
@@ -2889,6 +3069,29 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !byId("cdsheet").hidden) closeCard(); });
   byId("cd-cam").addEventListener("change", function () { pickCard(byId("cd-cam")); });
   byId("cd-album").addEventListener("change", function () { pickCard(byId("cd-album")); });
+  // まとめて選んだ写真を重ねるシート（2026-10-17）。外側に触れただけでは閉じない（まだ送っていない写真がある＝「やめる」で閉じる）
+  byId("gp-send").addEventListener("click", gpSend);
+  byId("gp-close").addEventListener("click", closeGp);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !byId("gpsheet").hidden) closeGp(); });
+  gpBox.addEventListener("pointerdown", function (e) {
+    if (!GP || GP.sent || gpDrag || (e.button && e.button !== 0)) return;
+    var t = e.target, li = t && t.closest ? t.closest(".gp-pile") : null;
+    if (!li || t.closest(".gp-split")) return;
+    gpDrag = { from: Number(li.getAttribute("data-i")), id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, live: false, over: -1 };
+    gpDrag.timer = setTimeout(gpLift, GP_HOLD);
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (!gpDrag || e.pointerId !== gpDrag.id) return;
+    if (!gpDrag.live) {
+      if (Math.abs(e.clientX - gpDrag.x0) > 10 || Math.abs(e.clientY - gpDrag.y0) > 10) { clearTimeout(gpDrag.timer); gpDrag = null; }   // 長押しの前に指が動いた＝画面を動かしたい（重ねない）
+      return;
+    }
+    gpMove(e.clientX, e.clientY);
+  });
+  document.addEventListener("pointerup", function (e) { if (gpDrag && e.pointerId === gpDrag.id) gpEnd(true); });
+  document.addEventListener("pointercancel", function (e) { if (gpDrag && e.pointerId === gpDrag.id) gpEnd(false); });
+  gpBox.addEventListener("touchmove", function (e) { if (gpDrag && gpDrag.live) e.preventDefault(); }, { passive: false });   // 重ねている間は画面を動かさない（指の動きを写真に渡す）。★重ねる画面の中だけに付ける＝ページ全体に付けると、どこを動かしても毎回待たされる（別の目 2026-10-17）
+  gpBox.addEventListener("contextmenu", function (e) { e.preventDefault(); });   // 長押しで「画像を保存」などのメニューを出さない
   byId("todo-retake").addEventListener("click", function () { var box = byId("retake-box"); if (!box.hidden) box.scrollIntoView({ behavior: "smooth", block: "start" }); });
   shCancel.addEventListener("click", function () { if (SH && SH.order) cancelOrder(SH.order, shCancel); });
   function sendOrder() {
