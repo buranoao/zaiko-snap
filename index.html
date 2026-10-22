@@ -403,7 +403,7 @@
   #cd-picks .pick{flex-wrap:wrap; align-content:center}   /* 「もう1枚」「カメラで撮る」を2行に折る（はみ出さない） */
   .sh-close.cd-send{background:var(--pink); font-family:var(--pop); font-weight:400; font-size:19px}   /* .sh-close（白）より後ろで勝つように2つ重ねる */
   .sh-close.cd-send:disabled{opacity:.45; box-shadow:none}
-  /* ---- まとめて選んだ写真を長押しで重ねる（2026-10-17）＝重ねた束が1つの出品・重ねなければ1枚ずつ別の品物 ---- */
+  /* ---- まとめて選んだ写真を長押しで重ねる（2026-10-17）＝重ねた束が1つの出品・2026-10-22 から開いた時は全部1つの束（「ばらす」で1枚ずつ） ---- */
   .gp-piles{list-style:none; margin:0; padding:10px 10px 4px 8px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px 16px; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none}
   @media (min-width:520px){ .gp-piles{grid-template-columns:repeat(4,minmax(0,1fr))} }
   .gp-pile{display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; cursor:grab}
@@ -560,7 +560,7 @@
     </div>
     <input type="file" id="file" accept="image/*" multiple>
     <label class="pick" for="file">写真を撮る・選ぶ</label>
-    <p>その場で<wbr>撮っても、<wbr>アルバムから<wbr>選んでも。<br>何枚<wbr>まとめてでも<wbr>大丈夫です。<br>2枚以上<wbr>選ぶと、<wbr>送る前に<wbr>セットを<wbr><span class="ph">重ねる画面が出ます。</span></p>
+    <p>その場で<wbr>撮っても、<wbr>アルバムから<wbr>選んでも。<br>何枚<wbr>まとめてでも<wbr>大丈夫です。<br>2枚以上<wbr>選ぶと、<wbr>送る前に<wbr>1つの品物に<wbr><span class="ph">まとめた画面が出ます。</span></p>
     <button class="pick pick-card" id="card-pick" type="button"><span class="cd-main"><span class="ph">カードを</span><span class="ph">撮って送る</span></span><span class="cd-sub">写真1〜5枚</span></button>
     <p>ポケカ・<wbr>ワンピなどの<wbr>カードは<wbr>こちら。<br>1枚の<wbr>カードを、<wbr>写真1〜5枚で<wbr>送れます<wbr><span class="ph">（表・裏・</span><wbr><span class="ph">傷のアップなど）。</span></p>
   </section>
@@ -818,20 +818,21 @@
 </div>
 
 <!-- まとめて選んだ写真を、長押しで重ねて「1つの出品」にする（2026-10-17 本人「長押しで重ねたらそれがセットって意味にする方がUI・UX的に良くない？」→「1」） -->
+<!-- ★2026-10-22 から、まとめて選んだ写真は最初から1つの束（本人「1度に送ったもの（6枚なら6枚）を送った時点で、それが一つのグループとしてカウントして見せる」→「2」）＝別々の品物は「ばらす」で分ける -->
 <div class="sheet-back" id="gpsheet" hidden>
   <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="gp-title">
     <header class="sh-head">
       <p class="sh-grp">まとめて選んだ写真</p>
-      <h2 class="sh-what" id="gp-title" tabindex="-1">セットは重ねてから送る</h2>
+      <h2 class="sh-what" id="gp-title" tabindex="-1">1つの品物として送る</h2>
     </header>
-    <p class="cd-lead"><span class="ph">同じ出品の写真は、</span><span class="ph">長押しして、</span><span class="ph">ほかの写真の上に</span><span class="ph">重ねてください。</span><span class="ph">重ねなければ、</span><span class="ph">1枚ずつ</span><span class="ph">別の品物として</span><span class="ph">送ります。</span></p>
+    <p class="cd-lead"><span class="ph">まとめて選んだ写真は、</span><span class="ph">1つの品物として</span><span class="ph">送ります。</span><span class="ph">別々の品物なら、</span><span class="ph">「ばらす」を</span><span class="ph">押してください。</span></p>
     <ol class="gp-piles" id="gp-piles" aria-label="選んだ写真"></ol>
     <p class="rt-msg" id="gp-msg" role="status" hidden></p>
     <div class="sh-acts st-acts">
       <button type="button" class="sh-close cd-send" id="gp-send">送る</button>
       <button type="button" class="sh-close" id="gp-close">やめる（送りません）</button>
     </div>
-    <p class="sh-foot">重ねた先の写真が、<wbr>在庫の一覧に<wbr>出る写真です。<wbr><span class="ph">束の「ばらす」で</span><wbr>元に戻せます。<wbr>「送る」を<wbr>押すまでは<wbr>送りません。</p>
+    <p class="sh-foot">束の1枚目の写真が、<wbr>在庫の一覧に<wbr>出る写真です。<wbr><span class="ph">ばらした写真は、</span><wbr>長押しで<wbr>重ね直せます。<wbr>「送る」を<wbr>押すまでは<wbr>送りません。</p>
   </section>
 </div>
 
@@ -1554,7 +1555,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     var picked = Array.prototype.slice.call(fileInput.files || []).filter(function (f) { return f && f.size > 0; });
     fileInput.value = "";
     if (picked.length) memoInput.value = "";   // ★メモは選んだ写真にだけ付ける＝次に選ぶ写真に前のメモが付いていた（2026-09-16 点検その3）
-    if (picked.length > 1) return openGp(picked, memo);   // 2枚以上＝送る前に、長押しでセットを重ねられるシート（2026-10-17）
+    if (picked.length > 1) return openGp(picked, memo);   // 2枚以上＝送る前に、最初から1つの束にしたシート（2026-10-17・束にしておくのは 2026-10-22 から）
     enqueue(picked.map(function (f) { return { file: f, memo: memo }; }));
   });
 
@@ -2557,7 +2558,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   // ---- まとめて選んだ写真を、長押しで重ねて「1つの出品」にする（2026-10-17 本人「これが同一の出品だよみたいな判明できる機能工夫できない？」
   //   →「長押しで重ねたらそれがセットって意味にする方がUI・UX的に良くない？」→「1」）----
   //   普通の入口で2枚以上選んだ時だけ、送る前にこのシートを出す（1枚ならこれまでどおりすぐ送る）。
-  //   写真を長押し（0.45秒）して、別の写真の上で指を離すと、その束に重なる（重ねた先の1枚目＝在庫の一覧の顔）。「ばらす」で元に戻る。重ねなければ1枚ずつ別の品物。
+  //   写真を長押し（0.45秒）して、別の写真の上で指を離すと、その束に重なる（重ねた先の1枚目＝在庫の一覧の顔）。「ばらす」で1枚ずつに戻る。
+  //   ★2026-10-22 から、開いた時は選んだ写真が全部1つの束（10枚を越えたら10枚ごとの束）＝一度に送った写真は1つの品物（本人の案）。別々の品物は「ばらす」。
   //   束の写真のメモに「［同じ出品］［カード N/M 組=<1枚目の受付番号>］」＝パソコンの在庫写真を取る.py がカードと同じ組として扱い、組の写真を全部見て現物を数える。★形を変えたら向こうの SAME_MARK も直す
   //   ★長押しは0.45秒（別の目 2026-10-17＝0.35秒だと、ゆっくり画面を動かし始めた指が止まった時に持ち上がりやすい・60代の指）
   var GP = null, GP_MAX = 10, GP_HOLD = 450;   // GP＝{ piles: [[{ file, url }]], memo, sent }／1つの出品は10枚まで（Yahoo!フリマの写真の上限）
@@ -2668,9 +2670,11 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   }
   function openGp(files, memo) {
     if (GP) GP.piles.forEach(function (p) { p.forEach(cdForget); });
-    GP = { piles: files.map(function (f) { var url = ""; try { url = URL.createObjectURL(f); } catch (e) {} return [{ file: f, url: url }]; }), memo: memo, sent: false };
+    var shots = files.map(function (f) { var url = ""; try { url = URL.createObjectURL(f); } catch (e) {} return { file: f, url: url }; }), piles = [];
+    for (var k = 0; k < shots.length; k += GP_MAX) piles.push(shots.slice(k, k + GP_MAX));   // 最初から1つの束（1つの出品は10枚まで＝越えた分は次の束）
+    GP = { piles: piles, memo: memo, sent: false };
     gpRender();
-    gpSay(null);
+    gpSay(piles.length > 1 ? ["1つの品物は", GP_MAX + "枚まで", "なので、", (GP_MAX + 1) + "枚目からは", "次の品物に", "なります。"] : null);
     byId("gpsheet").hidden = false;
     document.body.classList.add("sheet-open");
     try { byId("gp-title").focus({ preventScroll: true }); } catch (e) {}
