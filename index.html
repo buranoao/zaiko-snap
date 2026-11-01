@@ -195,6 +195,9 @@
   .swhen{margin:3px 0 0; font-family:var(--mono); font-size:13px; color:var(--muted)}
   .more{width:100%; min-height:48px; border-radius:10px; border:1px solid var(--rule); background:var(--card); color:var(--accent); font:700 15px/1.4 var(--gothic); cursor:pointer}
   .scancel{margin-top:8px; min-height:44px; padding:8px 18px; border-radius:10px; border:2px solid var(--ink); background:var(--card); color:var(--alert); font:700 15px/1.4 var(--gothic); cursor:pointer}   /* 見分け待ちの写真を取り消す（2026-10-17） */
+  .waitnote{background:var(--accent-soft); border:2px solid var(--ink); border-radius:12px; padding:12px 14px}   /* 見分け待ちの写真だけを出している時の説明（2026-11-01） */
+  .wmain{margin:0; font-size:17px; font-weight:700; line-height:1.5}
+  .waitnote .more{margin-top:10px}
   .scancel:disabled{color:var(--muted); cursor:default}
   .todo button[data-hot="1"]{background:var(--card); border-color:var(--rule); box-shadow:inset 6px 0 0 var(--warn)}
   details.tips summary{cursor:pointer; font-family:var(--mincho); font-weight:600; font-size:18px}
@@ -531,7 +534,7 @@
 
   <div class="pane" id="pane-home" hidden>
     <div class="todo">
-      <button type="button" id="todo-wait" data-hot="0"><span>見分け待ちの写真<span class="sub">届いたけれど、<wbr>まだ在庫に<wbr>入っていない写真</span></span><span class="n" id="n-todo-wait">–<small>枚</small></span></button>
+      <button type="button" id="todo-wait" data-hot="0"><span>見分け待ちの写真<span class="sub">Claudeが<wbr>在庫に入れる前の<wbr>写真。<wbr>作業は<wbr>要りません</span></span><span class="n" id="n-todo-wait">–<small>枚</small></span></button>
       <button type="button" id="todo-retake" data-hot="0"><span>写真の撮り直し<span class="sub">パソコンが<wbr>撮り直してほしい<wbr>写真</span></span><span class="n" id="n-todo-retake">–<small>件</small></span></button>
       <button type="button" id="todo-price" data-hot="0"><span>値段を決める<span class="sub">まだ出していない在庫</span></span><span class="n" id="n-todo-price">–<small>枚</small></span></button>
       <button type="button" id="todo-trade" data-hot="0"><span>取引中<span class="sub">売れて、<wbr>やりとりが<wbr>続いている物</span></span><span class="n" id="n-todo-trade">–<small>件</small></span></button>
@@ -861,7 +864,10 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var nWait = byId("n-wait"), nDone = byId("n-done"), nSent = byId("n-sent");
   var list = byId("list"), shotsEl = byId("shots"), homeTip = byId("home-tip");
   var shotsGrp = byId("shots-grp"), shotsSum = byId("shots-sum"), shotsTg = byId("shots-tg");
-  shotsGrp.addEventListener("toggle", function () { shotsTg.textContent = shotsGrp.open ? "とじる ▲" : "ひらく ▼"; });   // 開け閉めは覚えない＝開き直すと閉じている（2026-09-25 本人）
+  shotsGrp.addEventListener("toggle", function () {
+    shotsTg.textContent = shotsGrp.open ? "とじる ▲" : "ひらく ▼";
+    if (!shotsGrp.open && WAIT_ONLY) { WAIT_ONLY = false; renderShots(); }   // 閉じたら「見分け待ちだけ」をやめる＝次に自分で開いた時は全部の写真（2026-11-01）
+  });   // 開け閉めは覚えない＝開き直すと閉じている（2026-09-25 本人）
   var tabsEl = byId("tabs"), tabHome = byId("tab-home"), tabSend = byId("tab-send"), tabStock = byId("tab-stock");
   var paneHome = byId("pane-home"), paneSend = byId("pane-send"), paneStock = byId("pane-stock"), pcEl = byId("pc"), pcText = byId("pc-text");
   var stockBox = byId("stock"), stockNote = byId("stock-note"), findInput = byId("find"), filterEl = byId("filter");
@@ -1313,13 +1319,30 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     renderShots();
   }
   var SHOW_ALL = false;
+  // 「やること」の「見分け待ちの写真」から来た時は、見分け待ちの写真だけを出す（2026-11-01 ダンナ「ボタン押しても送付した別の写真とか出るから…
+  //   なんの写真が欲しいかわからねーんよ」「在庫にはいったらやることリストにだすなよ」）＝在庫に入った・取り消した写真を混ぜない。箱を閉じると元に戻る
+  var WAIT_ONLY = false;
   function renderShots() {
     shotsEl.textContent = "";
-    var all = shownHist().slice(0, 30), show = SHOW_ALL ? all : all.slice(0, 5);
-    list.hidden = !all.length;
+    var full = shownHist().slice(0, 30);
+    var all = WAIT_ONLY ? full.filter(function (h) { return h.state === "届いた"; }) : full;
+    var show = (SHOW_ALL || WAIT_ONLY) ? all : all.slice(0, 5);
+    list.hidden = !full.length && !WAIT_ONLY;
+    if (WAIT_ONLY) {
+      var wn = el("li", "waitnote");
+      wn.appendChild(segs(el("p", "wmain"), all.length ? "見分け待ちの写真だけを、出しています（" + all.length + "枚）" : "この端末から送った写真に、見分け待ちはありません"));
+      wn.appendChild(segs(el("p", "ssub"), "あなたの作業は、要りません。パソコンのClaudeが、在庫に入れると、ここから消えます。"));
+      var other = (Number(LAST_PENDING) || 0) - all.length;
+      if (other > 0) wn.appendChild(segs(el("p", "ssub"), (all.length ? "ほかの" : "見分け待ちの") + other + "枚は、ほかの端末か、LINEから、送った写真です。"));
+      var back = el("button", "more", "送った写真を全部見る");
+      back.type = "button";
+      back.addEventListener("click", function () { WAIT_ONLY = false; renderShots(); });
+      wn.appendChild(back);
+      shotsEl.appendChild(wn);
+    }
     // 閉じた見出し＝枚数と行方の数。届いていない写真は赤で出す＝閉じたままでも困った写真があると分かる（2026-09-25）
     var nOk = 0, nOff = 0, nNow = 0, nBad = 0, nCan = 0;
-    all.forEach(function (h) {
+    full.forEach(function (h) {   // 見出しの数は、見分け待ちだけを出している時も全部の写真で数える（閉じた見出しの意味を変えない）
       var s = h.state || "受付";
       if (s === "在庫") { if (inStock(h.label)) nOk += 1; else nOff += 1; }   // 外した品も数える＝内訳の合計が枚数と合う（別の目 2026-09-25）
       else if (s === "取消") nCan += 1;
@@ -1327,7 +1350,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       else nNow += 1;
     });
     shotsSum.textContent = "";
-    shotsSum.appendChild(el("span", "grp-n", all.length + "枚"));
+    shotsSum.appendChild(el("span", "grp-n", full.length + "枚"));
     if (nOk) shotsSum.appendChild(el("span", "", "在庫に入った " + nOk));
     if (nOff) shotsSum.appendChild(el("span", "", "在庫から外した " + nOff));
     if (nCan) shotsSum.appendChild(el("span", "", "取り消した " + nCan));
@@ -1382,7 +1405,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       li.appendChild(box);
       shotsEl.appendChild(li);
     });
-    if (all.length > 5) {
+    if (!WAIT_ONLY && all.length > 5) {
       var more = el("button", "more", SHOW_ALL ? "新しい5枚だけにする" : "前の写真も見る（全部で" + all.length + "枚）");
       more.type = "button";
       more.addEventListener("click", function () { SHOW_ALL = !SHOW_ALL; renderShots(); });
@@ -1639,7 +1662,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   }
   function renderHome() {
     setN(byId("n-todo-wait"), LAST_PENDING, "枚");
-    byId("todo-wait").setAttribute("data-hot", LAST_PENDING ? "1" : "0");
+    // ★本人の作業ではない（Claudeが在庫に入れるのを待っているだけ）＝やることの色を付けない（2026-11-01 ダンナ「なんの写真が欲しいかわからねーんよ」）
+    byId("todo-wait").setAttribute("data-hot", "0");
     var price = null, trades = null;
     if (STOCK && STOCK.groups) {
       price = 0;
@@ -1662,6 +1686,9 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   byId("todo-wait").addEventListener("click", function () {
     showTab("send");
     // 「見分け待ちの写真」から来た＝写真を見たい＝送った写真の箱を開いて、そこまで動く（ふだんは閉じている・2026-09-25 再検証で見つけた）
+    // ★見分け待ちの写真だけを出す（2026-11-01 ダンナ）＝在庫に入った・取り消した写真を混ぜない
+    WAIT_ONLY = true;
+    renderShots();
     if (!list.hidden) { shotsGrp.open = true; setTimeout(function () { list.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); }
   });
   byId("todo-price").addEventListener("click", function () { showTab("stock"); var b = filterEl.querySelector("button[data-f=未出品]"); if (b) b.click(); });
