@@ -1911,10 +1911,12 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       return (g.items || []).filter(function (it) {
         if (curFilter !== "all" && it.state !== curFilter) return false;
         return !q || (g.name + " " + it.label + " " + it.what + " " + it.where).toLowerCase().indexOf(q) !== -1;
-      }).sort(function (a, b) { return (ORDER[a.state] || 9) - (ORDER[b.state] || 9); });
+      }).sort(function (a, b) { return ((ORDER[a.state] || 9) - (ORDER[b.state] || 9)) || (digits(b.price) - digits(a.price)); });   // 2026-11-09 本人「出品中のリスト 価格が高い順に」＝同じ状態の中は値段の高い順（未定は下）
     };
     var nGroups = STOCK.groups.filter(function (g) { return pick(g).length; }).length;
-    STOCK.groups.forEach(function (g) {
+    var topPrice = function (g) { return pick(g).reduce(function (m, it) { return Math.max(m, digits(it.price)); }, 0); };
+    var groupsInOrder = curFilter === "出品中" ? STOCK.groups.slice().sort(function (a, b) { return topPrice(b) - topPrice(a); }) : STOCK.groups;   // 2026-11-09「出品中」で絞った時は、高い品がある作品から並べる（出品停止を探しやすく）
+    groupsInOrder.forEach(function (g) {
       var items = pick(g);
       if (!items.length) return;
       var sec = el("details", "grp"), h = el("summary", "grp-h"), n = 0;
