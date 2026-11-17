@@ -1175,7 +1175,12 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     function viaData() {
       return readAsDataURL(file).then(loadImage).then(function (im) { return { src: im, w: im.naturalWidth, h: im.naturalHeight }; });
     }
-    return viaUrl()["catch"](viaBitmap)["catch"](viaData);
+    // ★2026-11-17 最後に、小さく縮めながら開く（手元の余力が足りなくても開けることがある）。縦長でも横長でも長い辺が MAX_EDGE を少し超える程度に収まる
+    function viaBitmapSmall() {
+      if (typeof createImageBitmap !== "function") throw new Error("decode");
+      return createImageBitmap(file, { resizeWidth: MAX_EDGE, resizeQuality: "high" }).then(function (bm) { return { src: bm, w: bm.width, h: bm.height }; });
+    }
+    return viaUrl()["catch"](viaBitmap)["catch"](viaData)["catch"](viaBitmapSmall);
   }
   function freeDecoded(d) {
     if (!d) return;
@@ -1236,6 +1241,98 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       });
     }
     return go(job.file);
+  }
+
+  // ★2026-11-17 ダンナ「そもそも送れないって状態にしないでほしい」＝縮めるために写真を開けなくても、元のまま送る（開かなくても送れる）。
+  //   元の写真には撮った場所（位置情報＝GPS）が入る＝送る前にスマホの中で消す。消し切れない形なら、その付属データの塊ごと捨てる。
+  //   メモに印「［元のまま］」を付ける＝パソコンの在庫写真を取る.py が向きを直し、長い辺2400に縮め、付属データを全部落とす（形を変えたら向こうも直す）
+  var RAW_MARK = "［元のまま］";
+  function readBuf(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(new Uint8Array(fr.result)); };
+      fr.onerror = function () { reject(fr.error); };
+      fr.readAsArrayBuffer(blob);
+    });
+  }
+  function startsWith(u8, at, s) {
+    if (at + s.length > u8.length) return false;
+    for (var k = 0; k < s.length; k++) if (u8[at + k] !== s.charCodeAt(k)) return false;
+    return true;
+  }
+  // 撮影の情報（Exif）の中の位置情報（GPS）の箱を0で塗りつぶし、件数0の空の箱にする。読み切れなければ false（＝塊ごと捨てる）
+  function dropGps(seg, t0) {
+    try {
+      var n = seg.length, le;
+      if (seg[t0] === 0x49 && seg[t0 + 1] === 0x49) le = true;
+      else if (seg[t0] === 0x4D && seg[t0 + 1] === 0x4D) le = false;
+      else return false;
+      var g16 = function (o) { if (o < 0 || o + 2 > n) throw 0; return le ? seg[o] | (seg[o + 1] << 8) : (seg[o] << 8) | seg[o + 1]; };
+      var g32 = function (o) { if (o < 0 || o + 4 > n) throw 0; return le ? (seg[o] | (seg[o + 1] << 8) | (seg[o + 2] << 16)) + seg[o + 3] * 16777216 : seg[o] * 16777216 + ((seg[o + 1] << 16) | (seg[o + 2] << 8) | seg[o + 3]); };
+      var zero = function (o, len) { if (o < 0 || len < 0 || o + len > n) throw 0; for (var k = 0; k < len; k++) seg[o + k] = 0; };
+      var SZ = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
+      var ifd = t0 + g32(t0 + 4), cnt = g16(ifd);
+      for (var e = 0; e < cnt; e++) {
+        var ent = ifd + 2 + e * 12;
+        if (g16(ent) !== 0x8825) continue;   // 0x8825＝位置情報の箱を指す札
+        var gps = t0 + g32(ent + 8), gn = g16(gps);
+        for (var j = 0; j < gn; j++) {
+          var ge = gps + 2 + j * 12, sz = (SZ[g16(ge + 2)] || 1) * g32(ge + 4);
+          if (sz > 4) zero(t0 + g32(ge + 8), sz);   // 箱の外に置かれた値（緯度・経度など）も塗る
+          zero(ge, 12);
+        }
+        zero(gps, 2);
+      }
+      return true;
+    } catch (x) { return false; }
+  }
+  // JPEG の付属データの塊を見て、位置情報を消した写しを返す（元の写真は書き換えない）。JPEG でなければ投げる
+  function scrubJpeg(u8) {
+    if (!(u8.length > 4 && u8[0] === 0xFF && u8[1] === 0xD8)) throw new Error("notjpeg");
+    var parts = [u8.subarray(0, 2)], i = 2, sos = false;
+    while (i + 4 <= u8.length) {
+      if (u8[i] !== 0xFF) throw new Error("notjpeg");
+      var mk = u8[i + 1];
+      if (mk === 0xFF) { i += 1; continue; }   // 詰め物
+      if (mk === 0xDA) { sos = true; break; }   // 絵の中身が始まる
+      if (mk === 0xD9) break;
+      if ((mk >= 0xD0 && mk <= 0xD7) || mk === 0x01) { parts.push(u8.subarray(i, i + 2)); i += 2; continue; }
+      var len = (u8[i + 2] << 8) | u8[i + 3], end = i + 2 + len;
+      if (len < 2 || end > u8.length) throw new Error("notjpeg");
+      if (mk === 0xE1) {
+        var seg = u8.slice(i, end);   // 写しを塗る
+        if (startsWith(seg, 4, "Exif\u0000\u0000") && dropGps(seg, 10)) parts.push(seg);   // 向きなどは残し、位置だけ消す
+        i = end;   // 消し切れない Exif と、ほかの付属データ（XMP など＝位置が書かれることがある）は捨てる
+        continue;
+      }
+      // ★付属データの塊（APP0〜15・コメント）は、絵を正しく出すのに要る物だけ残す（2026-11-17 別の目＝Photoshop の箱・来歴・コメントにも場所が書かれうる）
+      //   残す＝APP0（JFIF）・APP2 の色の情報（ICC_PROFILE）・APP14（Adobe＝色の並び）。後ろの2枚目の目印（MPF）も、ほかの箱も捨てる
+      if ((mk >= 0xE0 && mk <= 0xEF) || mk === 0xFE) {
+        var keepIt = mk === 0xE0 || mk === 0xEE || (mk === 0xE2 && startsWith(u8, i + 4, "ICC_PROFILE\u0000"));
+        if (keepIt) parts.push(u8.subarray(i, end));
+        i = end;
+        continue;
+      }
+      parts.push(u8.subarray(i, end));   // 表（量子化・ハフマン）・絵の大きさなど＝絵に要る物
+      i = end;
+    }
+    // ★本体の絵の終わり（FFD9）で切る＝後ろにくっついた2枚目の絵（明るさ用の絵など・中に撮影の情報を持つことがある）は送らない
+    //   絵の中身では 0xFF の後ろに 00 が入る決まり＝最初の FFD9 が本体の終わり
+    var eoi = -1;
+    for (var q = i; q + 1 < u8.length; q++) { if (u8[q] === 0xFF && u8[q + 1] === 0xD9) { eoi = q + 2; break; } }
+    if (!sos || eoi < 0) throw new Error("notjpeg");   // 途中で切れた写真＝「届いた」にしない（読み込み直し待ちへ・2026-11-17 別の目）
+    parts.push(u8.subarray(i, eoi));
+    var total = 0, at = 0;
+    parts.forEach(function (p) { total += p.length; });
+    var out = new Uint8Array(total);
+    parts.forEach(function (p) { out.set(p, at); at += p.length; });
+    return out;
+  }
+  function rawJpeg(job) {
+    var from = function (b) { return readBuf(b).then(scrubJpeg); };
+    return Promise.resolve(job.kept).then(function () { return keptBlob(job.uid); })
+      .then(function (b) { return b ? from(b)["catch"](function () { return from(job.file); }) : from(job.file); })   // スマホの中に残した写しから・だめなら選んだ写真から
+      .then(function (u8) { return { blob: new Blob([u8], { type: "image/jpeg" }), thumb: "", raw: true }; });
   }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -1330,7 +1427,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   var CANCEL_SHOW_MS = 3 * 3600000;
   function shownHist() {
     var now = Date.now();
-    return hist.filter(function (h) { return !(h.state === "取消" && now - (h.cAt || h.at || 0) > CANCEL_SHOW_MS); });
+    return hist.filter(function (h) { return h.state !== "消した" && !(h.state === "取消" && now - (h.cAt || h.at || 0) > CANCEL_SHOW_MS); });   // 消した行は出さない（2026-11-17）
   }
   function loadHist() {
     try { var h = JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); return Array.isArray(h) ? h : []; } catch (e) { return []; }
@@ -1360,7 +1457,57 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     var h = histOf(uid);
     if (!h) { h = { uid: uid, at: Date.now(), state: "受付" }; hist.unshift(h); }
     Object.keys(patch || {}).forEach(function (k) { h[k] = patch[k]; });
+    if (h.state === "届いた" || h.state === "在庫") clearSame(h);
     saveHist();
+    renderShots();
+  }
+  // ---- 「送れなかった」行を片付ける（2026-11-17 ダンナ「送れないって出たとき削除したい」「そもそも送れないって状態にしないでほしい」）----
+  //   ①同じ写真（元のファイル名・大きさ・時刻が同じ）が後で届いたら、前の「送れなかった・届いていない・待ち」の行は自動で消す（同じ写真を二重に送らない）
+  //   ②残った行は「この行を消す」で消せる（2回押し）。★記録からは外さず「消した」の印で隠す＝撮り直しのお願いが「送りました」に化けない
+  var SHOT_DROP = {};
+  function shotKey(job) {
+    if (!job || (!job.name && !job.lm)) return "";   // 名前も時刻も無い写真は見分けられない＝印を付けない（大きさだけで別の写真を消さない）
+    return (job.name || "") + "／" + (job.size || 0) + "／" + (job.lm || 0);
+  }
+  function dropShot(h) {
+    var was = h.state;
+    failed = failed.filter(function (q) { return q.uid !== h.uid; });
+    queue = queue.filter(function (q) { return q.uid !== h.uid; });
+    delete checking[h.uid];
+    delete SHOT_DROP[h.uid];
+    forget(h.uid);   // スマホの中に残した写しも消す（開き直した時に送り直さない）
+    rtForget(h.uid);   // 撮り直しの「送りました」の印からも外す（記録があふれて消えても「送りました」に化けない・2026-11-17 別の目）
+    h.state = "消した";
+    h.dAt = Date.now();
+    // 送れなかったと思っていても、受け口には届いていたことがある（3回目の失敗など）＝受け口でも取り消す（パソコンが拾わない）。無ければ何も起きない
+    if (CANCEL_PHOTO && was !== "bad") api("cancelphoto", { uid: h.uid }, 35000, 2).then(null, function () {});
+  }
+  function clearSame(h) {
+    if (!h || !h.sid) return;
+    hist.forEach(function (o) {
+      if (o !== h && o.sid === h.sid && (o.state === "bad" || o.state === "待ち" || o.state === "届かず")) dropShot(o);
+    });
+  }
+  // 消せる行＝送れなかった・届いていない・待ち／途中で止まったまま動いていない行（送っている最中・確かめている最中の行は消せない）
+  function canDrop(h) {
+    if (h.state === "bad" || h.state === "待ち" || h.state === "届かず") return true;
+    if (h.state !== "受付" && h.state !== "確かめ中") return false;
+    if (!BOOTED || ACTIVE[h.uid] || checking[h.uid]) return false;
+    return !queue.some(function (q) { return q.uid === h.uid; }) && !failed.some(function (q) { return q.uid === h.uid; });
+  }
+  function askDrop(h) {
+    if (!canDrop(h)) return;
+    if (!(SHOT_DROP[h.uid] || {}).ask) {
+      // ★1回目は聞くだけ＝押し間違いで消さない。6秒たつと元に戻る（取り消すボタンと同じ）
+      SHOT_DROP[h.uid] = { ask: true };
+      renderShots();
+      setTimeout(function () { var c = SHOT_DROP[h.uid]; if (c && c.ask) { delete SHOT_DROP[h.uid]; renderShots(); } }, 6000);
+      return;
+    }
+    dropShot(h);
+    saveHist();
+    if (!running && !queue.length) retryBtn.hidden = !(failed.length || lostN());
+    showQueue();
     renderShots();
   }
   var SHOW_ALL = false;
@@ -1402,7 +1549,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     if (nNow) shotsSum.appendChild(el("span", "", "途中 " + nNow));
     if (nBad) shotsSum.appendChild(el("span", "hot", "届いていない " + nBad));
     show.forEach(function (h) {
-      var st = h.state || "受付", kind = "busy", main = "送っています…", sub = "";
+      var st = h.state || "受付", kind = "busy", main = "送っています…", sub = "", subParts = null;
       // ★在庫から外した品の写真が「在庫に入りました」のまま残ると混乱する（2026-09-23 本人「ラプラスいるけど、これキャンセルしたよね」）
       //   ＝消さずに、いまの事実を出す。消すと「送ったのに消えた＝届かなかった？」と分からなくなる
       if (st === "在庫") {
@@ -1419,7 +1566,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       else if (st === "届かず") { kind = "bad"; main = "届いていません"; sub = "「いますぐ送り直す」を押すと、もう一度送ります"; }
       else if (st === "待ち" && h.code === "decode") { kind = "now"; main = "読み込み直し待ち"; sub = "少し待って、写真を読み込み直し、自動で送ります（押さなくて大丈夫）"; }   // 2026-11-16
       else if (st === "待ち") { kind = "bad"; main = "電波待ち"; sub = "電波が戻ったら、自動で送り直します"; }
-      else if (st === "bad") { kind = "bad"; main = "送れませんでした"; sub = reason(h.code || "network").join(""); }
+      else if (st === "bad") { kind = "bad"; main = "送れませんでした"; subParts = reason(h.code || "network"); }   // 言葉の区切りのまま並べる（つないで文字数で切ると「送ってくださ／い」になった・2026-11-17）
       var li = el("li", "shot2");
       li.setAttribute("data-kind", kind);
       if (h.thumb) {
@@ -1435,7 +1582,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       m.appendChild(el("span", "sdot"));
       m.appendChild(document.createTextNode(main));
       box.appendChild(m);
-      if (sub) box.appendChild(segs(el("p", "ssub"), sub));
+      if (subParts) { var sp = el("p", "ssub"); put(sp, subParts); box.appendChild(sp); }
+      else if (sub) box.appendChild(segs(el("p", "ssub"), sub));
       var d = new Date(h.at || Date.now());
       box.appendChild(el("p", "swhen", (d.getMonth() + 1) + "月" + d.getDate() + "日 " + pad(d.getHours()) + ":" + pad(d.getMinutes())));
       // 間違えて送った写真を取り消す（2026-10-17 本人「間違って送信しちゃったので取り消しボタンつけたい（届きました（見分け中）って時に）」）
@@ -1447,6 +1595,15 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
         cb.disabled = !!(cs.busy || cs.off);
         cb.addEventListener("click", function () { cancelShot(h); });
         box.appendChild(cb);
+      }
+      // 送れなかった・届いていない・待ちの行を、この一覧から消す（2026-11-17 ダンナ「送れないって出たとき削除したいんだけど」）
+      if (canDrop(h)) {
+        var ds = SHOT_DROP[h.uid] || {};
+        var db = segs(el("button", "scancel sdrop"), ds.ask ? "本当に消す（もう一度押す）" : "この行を消す");
+        db.type = "button";
+        db.addEventListener("click", function () { askDrop(h); });
+        box.appendChild(db);
+        if (ds.ask) box.appendChild(segs(el("p", "ssub"), "この一覧から消して、送るのもやめます。アルバムの写真は消えません"));
       }
       li.appendChild(box);
       shotsEl.appendChild(li);
@@ -1495,12 +1652,14 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     items.forEach(function (it) {
       var f = it.file || {};
       var job = { file: it.file, memo: it.memo, uid: it.uid || makeUid(), name: it.name || f.name || "", size: it.size || f.size || 0, lm: it.lm || f.lastModified || 0, dr: it.dr || 0 };   // dr＝読み込めずに送り直しへ回した回数（2026-11-16）
+      var sk = shotKey(job);   // 同じ写真の印（2026-11-17＝後で同じ写真が届いたら、前の「送れなかった」行を消すため）
       if (it.resumed) {
         job.kept = null;   // 前に残した分はもうスマホの中に入っている
-        if (!histOf(job.uid)) mark(job.uid, { state: "受付", at: it.at || Date.now() });
+        if (!histOf(job.uid)) mark(job.uid, { state: "受付", at: it.at || Date.now(), sid: sk });
+        else if (sk && !histOf(job.uid).sid) histOf(job.uid).sid = sk;
       } else {
         job.kept = keep(job);   // 受け付けた瞬間にスマホの中へ残す
-        mark(job.uid, { state: "受付", at: Date.now() });
+        mark(job.uid, { state: "受付", at: Date.now(), sid: sk });
       }
       queue.push(job);
     });
@@ -1508,10 +1667,14 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     pump();
   }
 
+  var ACTIVE = {}, BOOTED = false;   // ACTIVE＝いま送っている写真の受付番号／BOOTED＝開いた時の続き（スマホに残した写真）を並べ終えた（2026-11-17＝止まったままの行だけ消せるようにする）
   function pump() {
     while (running < PARALLEL && queue.length) {
       running += 1;
-      work(queue.shift()).then(function () { running -= 1; showQueue(); pump(); settle(); });
+      (function (job) {
+        ACTIVE[job.uid] = 1;
+        work(job).then(function () { delete ACTIVE[job.uid]; running -= 1; showQueue(); pump(); settle(); });
+      })(queue.shift());
     }
   }
 
@@ -1520,16 +1683,19 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     mark(job.uid, { state: "受付", code: "" });
     var heif = /hei[cf]/i.test((f && f.type) || "") || /[.]hei[cf]$/i.test(job.name || "");
     return (heif ? toJpeg(f) : toJpegRetry(job))["catch"](function () {   // HEIF は形式で読めない＝待っても変わらないので読み直さない
-      throw fail(heif ? "heif" : "decode");
+      if (heif) throw fail("heif");
+      // ★2026-11-17 開けなかった＝縮めずに元のまま送る（位置情報だけ消す）。元の写真まで読めない時だけ「読み込み直し待ち」へ
+      return rawJpeg(job)["catch"](function () { throw fail("decode"); });
     }).then(function (r) {
-      mark(job.uid, { thumb: r.thumb });
+      if (r.raw) job.raw = true;
+      if (r.thumb) mark(job.uid, { thumb: r.thumb });
       return readAsDataURL(r.blob);
     }).then(function (url) {
       var b64 = url.slice(url.indexOf(",") + 1);
       if (b64.length > 27000000) throw fail("too_large");
       // 撮影ID＝スマホの元のファイル名・大きさ・時刻。同じ1枚をもう一度送った時に、取り込み側で「同じ写真」と分かる
       var sid = "［撮影ID " + (job.name || "名前なし") + "／" + (job.size || 0) + "／" + (job.lm || 0) + "］";
-      return send(b64, (job.memo ? job.memo + " " : "") + sid, job.uid);
+      return send(b64, (job.memo ? job.memo + " " : "") + (job.raw ? RAW_MARK + " " : "") + sid, job.uid);
     }).then(function (res) {
       var h = histOf(job.uid);
       if (!(res && res.sure) && !(h && (h.state === "届いた" || h.state === "在庫"))) {
@@ -1682,6 +1848,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
         if (checking[u]) { delete checking[u]; sent += 1; nSent.textContent = String(sent); }   // 確かめ中だった写真が届いていた＝ここで初めて控えを消す
         forget(u);
         if (it.state === "done") { h.state = "在庫"; h.label = it.label || ""; } else { h.state = "届いた"; }
+        clearSame(h);   // 同じ写真の前の「送れなかった」行を片付ける（2026-11-17）
         changed = true;
       });
       if (changed) { saveHist(); showQueue(); }
@@ -2435,11 +2602,23 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     var uids = (v && v.uids) || [];
     if (!uids.length) return { t: t, sending: false };
     var hs = uids.map(histOf);
-    if (hs.every(function (h) { return h && (h.state === "bad" || h.state === "取消"); })) return null;   // 取り消した撮り直しの写真も「送れなかった」と同じ＝お願いを出し直す（2026-10-17）
+    if (hs.every(function (h) { return h && (h.state === "bad" || h.state === "取消" || h.state === "消した"); })) return null;   // 一覧から消した写真も「送れなかった」と同じ（2026-11-17）   // 取り消した撮り直しの写真も「送れなかった」と同じ＝お願いを出し直す（2026-10-17）
     return { t: t, sending: !hs.some(function (h) { return !h || h.state === "届いた" || h.state === "在庫"; }) };   // 記録が消えた古い写真は届いた扱い
   }
   function rtSent(r) { var i = rtSentInfo(r); return i ? i.t : 0; }
   function rtSending(r) { var i = rtSentInfo(r); return !!(i && i.sending); }
+  function rtForget(uid) {   // その写真を撮り直しの印から外す＝全部外れたお願いは、また「撮り直して送る」に戻る（2026-11-17）
+    var o = rtSentAll(), ch = false;
+    Object.keys(o).forEach(function (k) {
+      var v = o[k];
+      if (v && Array.isArray(v.uids) && v.uids.indexOf(uid) !== -1) {
+        v.uids = v.uids.filter(function (u) { return u !== uid; });
+        if (!v.uids.length) delete o[k];
+        ch = true;
+      }
+    });
+    if (ch) { try { localStorage.setItem(RT_KEY, JSON.stringify(o)); } catch (e) {} if (STOCK) renderRetakes(); }
+  }
   function rtMarkSent(r, uids) {
     var o = rtSentAll(), live = {};
     (retakesOf() || []).forEach(function (x) { live[rtKey(x)] = 1; });
@@ -3442,11 +3621,14 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   loadOrders();   // 赤枠待ちを最初の画面（写真を送る）でも出すため、開いたらお願いの一覧も読む（2026-09-16）
   // 前に送れていなかった写真（スマホの中に残してある分）を、続きから送る
   kept().then(function (rows) {
+    BOOTED = true;   // ここから後に「受付」「確かめ中」のまま動いていない行＝止まった行（消せる）
+    renderShots();
     if (!rows || !rows.length) return;
     rows.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
     enqueue(rows.map(function (r) { return { file: r.blob, memo: r.memo, uid: r.uid, name: r.name, size: r.size, lm: r.lm, at: r.at, resumed: true }; }).filter(function (it) {
       // 前に「確かめ中」「届いていません」だった写真は、すぐには送り直さず、行方を聞いて確かめる（2026-09-15）
       var h = histOf(it.uid);
+      if (h && h.state === "消した") { forget(it.uid); return false; }   // 一覧から消した写真は送らない（写しの片付けに失敗していても・2026-11-17 別の目）
       if (!h || (h.state !== "確かめ中" && h.state !== "届かず")) return true;
       if (h.state === "届かず") it.lost = true;
       checking[it.uid] = it;
