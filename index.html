@@ -1108,7 +1108,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   }
 
   var 理由 = {
-    decode: ["写真を", "読み込めませんでした"],
+    decode: ["何度か", "読み込み直しても", "写真を", "読み込めませんでした。", "お手数ですが、", "もう一度選んで", "送ってください"],
     heif: ["この形式（HEIF）は", "読めません。", "カメラ設定の", "「高効率」を", "オフに"],
     too_large: ["大きすぎます"],
     not_allowed: ["リンクが", "古いようです。", "新しいリンク（QRコード）で", "開き直してください"],
@@ -1157,17 +1157,39 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       im.src = src;
     });
   }
+  // ★2026-11-16 まず写真のまま開く（本人「在庫スナップ送れないが多発してる」）＝前は一度文字（data URL）に直してから開いていた。
+  //   6MBの写真で約17MBの文字が要り、まとめて送る時にスマホの手元の余力が足りず「読み込めませんでした」になっていた（欠けた組は8〜10枚のまとめ送りに多い）。
+  //   開けなければ、前の2つのやり方（createImageBitmap → 文字に直して開く）を順に試す
   function decode(file) {
-    return readAsDataURL(file).then(loadImage).then(function (im) {
-      return { src: im, w: im.naturalWidth, h: im.naturalHeight };
-    })["catch"](function () {
+    function viaUrl() {
+      var u = "";
+      try { u = URL.createObjectURL(file); } catch (e) { return Promise.reject(new Error("decode")); }
+      return loadImage(u).then(function (im) {
+        return { src: im, w: im.naturalWidth, h: im.naturalHeight, url: u };
+      }, function (e) { try { URL.revokeObjectURL(u); } catch (x) {} throw e; });
+    }
+    function viaBitmap() {
       if (typeof createImageBitmap !== "function") throw new Error("decode");
       return createImageBitmap(file).then(function (bm) { return { src: bm, w: bm.width, h: bm.height }; });
-    });
+    }
+    function viaData() {
+      return readAsDataURL(file).then(loadImage).then(function (im) { return { src: im, w: im.naturalWidth, h: im.naturalHeight }; });
+    }
+    return viaUrl()["catch"](viaBitmap)["catch"](viaData);
+  }
+  function freeDecoded(d) {
+    if (!d) return;
+    if (d.url) { try { URL.revokeObjectURL(d.url); } catch (e) {} d.url = ""; }
+    if (d.src && d.src.close) { try { d.src.close(); } catch (e) {} }
   }
   function toJpeg(file) {
     return decode(file).then(function (d) {
-      if (!d.w || !d.h) throw new Error("decode");
+      if (!d.w || !d.h) { freeDecoded(d); throw new Error("decode"); }
+      try { return drawJpeg(d); } finally { freeDecoded(d); }
+    });
+  }
+  function drawJpeg(d) {   // 中の字下げは前の形のまま（差分を小さくするため）
+    {
       var s = Math.min(1, MAX_EDGE / Math.max(d.w, d.h));
       var c = document.createElement("canvas");
       c.width = Math.max(1, Math.round(d.w * s));
@@ -1176,7 +1198,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       g.fillStyle = "#ffffff";
       g.fillRect(0, 0, c.width, c.height);
       g.drawImage(d.src, 0, 0, c.width, c.height);
-      if (d.src.close) d.src.close();
+      freeDecoded(d);   // 縮めた絵に描き終えたら、元の大きな絵はすぐ手放す
       var ts = Math.min(1, 160 / Math.max(c.width, c.height));   // 送った写真の行に出す小さな絵（端末に30枚ぶん残すので小さく）
       var tc = document.createElement("canvas");
       tc.width = Math.max(1, Math.round(c.width * ts));
@@ -1190,7 +1212,30 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
           if (b && b.size) resolve({ blob: b, thumb: thumb }); else reject(new Error("decode"));
         }, "image/jpeg", QUALITY);
       });
-    });
+    }
+  }
+
+  // ★写真を読む所で1回つまずいても諦めない（2026-11-16 本人「在庫スナップ送れないが多発してる」）
+  //   実例＝11/16 10:02 の6枚の組の1枚目だけ「読み込めませんでした」で終わり、1分後に同じ写真を送り直すと届いた（前は読めなければその場で「送れませんでした」＝自動の送り直しに乗らなかった）。
+  //   その場で2回読み直す（1.5秒・4秒あけて・1回目はスマホの中に残した写しから）。それでもだめなら「読み込み直し待ち」として自動の送り直しに乗せ、3巡しても読めない時だけ「送れませんでした」
+  var DECODE_WAIT = [1500, 4000], DECODE_ROUNDS = 3;
+  function keptBlob(uid) {
+    return qdo("readonly", function (st) { return st.get(uid); }).then(function (r) { return r && r.blob ? r.blob : null; }, function () { return null; });
+  }
+  function toJpegRetry(job) {
+    var n = 0;
+    function go(f) {
+      return toJpeg(f)["catch"](function (e) {
+        if (n >= DECODE_WAIT.length) throw e;
+        var ms = DECODE_WAIT[n], useKept = n === 0;
+        n += 1;
+        return wait(ms).then(function () {
+          if (!useKept) return job.file;
+          return Promise.resolve(job.kept).then(function () { return keptBlob(job.uid); }).then(function (b) { return b || job.file; });
+        }).then(go);
+      });
+    }
+    return go(job.file);
   }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -1372,6 +1417,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       else if (st === "取消") { kind = "off"; main = "取り消しました"; sub = "在庫には入りません。間違えた時は、もう一度写真を送ってください"; }
       else if (st === "確かめ中") { kind = "now"; main = "届いたか確かめています"; sub = SAFE ? "届いたと分かるまで、写真はスマホに残します" : "送り終わるまで、この画面を閉じないでください"; }
       else if (st === "届かず") { kind = "bad"; main = "届いていません"; sub = "「いますぐ送り直す」を押すと、もう一度送ります"; }
+      else if (st === "待ち" && h.code === "decode") { kind = "now"; main = "読み込み直し待ち"; sub = "少し待って、写真を読み込み直し、自動で送ります（押さなくて大丈夫）"; }   // 2026-11-16
       else if (st === "待ち") { kind = "bad"; main = "電波待ち"; sub = "電波が戻ったら、自動で送り直します"; }
       else if (st === "bad") { kind = "bad"; main = "送れませんでした"; sub = reason(h.code || "network").join(""); }
       var li = el("li", "shot2");
@@ -1448,7 +1494,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
     retryBtn.hidden = true;
     items.forEach(function (it) {
       var f = it.file || {};
-      var job = { file: it.file, memo: it.memo, uid: it.uid || makeUid(), name: it.name || f.name || "", size: it.size || f.size || 0, lm: it.lm || f.lastModified || 0 };
+      var job = { file: it.file, memo: it.memo, uid: it.uid || makeUid(), name: it.name || f.name || "", size: it.size || f.size || 0, lm: it.lm || f.lastModified || 0, dr: it.dr || 0 };   // dr＝読み込めずに送り直しへ回した回数（2026-11-16）
       if (it.resumed) {
         job.kept = null;   // 前に残した分はもうスマホの中に入っている
         if (!histOf(job.uid)) mark(job.uid, { state: "受付", at: it.at || Date.now() });
@@ -1472,8 +1518,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
   function work(job) {
     var f = job.file;
     mark(job.uid, { state: "受付", code: "" });
-    return toJpeg(f)["catch"](function () {
-      var heif = /hei[cf]/i.test((f && f.type) || "") || /[.]hei[cf]$/i.test(job.name || "");
+    var heif = /hei[cf]/i.test((f && f.type) || "") || /[.]hei[cf]$/i.test(job.name || "");
+    return (heif ? toJpeg(f) : toJpegRetry(job))["catch"](function () {   // HEIF は形式で読めない＝待っても変わらないので読み直さない
       throw fail(heif ? "heif" : "decode");
     }).then(function (r) {
       mark(job.uid, { thumb: r.thumb });
@@ -1498,6 +1544,12 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       return Promise.resolve(job.kept).then(function () { return forget(job.uid); });
     }, function (e) {
       var code = (e && e.code) || "network";
+      if (code === "decode" && job.dr + 1 < DECODE_ROUNDS) {
+        // 読めなかった＝スマホの中の写しは残したまま、自動の送り直しに乗せる（10秒→30秒→…・ページを閉じても次に開いた時に続きから）
+        mark(job.uid, { state: "待ち", code: "decode" });
+        failed.push({ file: job.file, memo: job.memo, uid: job.uid, name: job.name, size: job.size, lm: job.lm, resumed: true, dr: job.dr + 1 });
+        return;
+      }
       if (code === "decode" || code === "heif" || code === "too_large") {
         mark(job.uid, { state: "bad", code: code });
         return Promise.resolve(job.kept).then(function () { return forget(job.uid); });
@@ -1505,7 +1557,7 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       if (code === "not_allowed") { mark(job.uid, { state: "bad", code: code }); return; }
       // 電波や受け口のつまずき＝ボタンを押さなくても、あとで自動で送り直す（スマホの中に残してある）
       mark(job.uid, { state: "待ち", code: code });
-      failed.push({ file: job.file, memo: job.memo, uid: job.uid, name: job.name, size: job.size, lm: job.lm, resumed: true });
+      failed.push({ file: job.file, memo: job.memo, uid: job.uid, name: job.name, size: job.size, lm: job.lm, resumed: true, dr: job.dr });
     });
   }
 
@@ -1555,7 +1607,8 @@ var HOME_D = "AKfycbz3dM57Tz1QwS5pPAcoT_0elAUomHtyRn8kTY0fqAQq-DgkSFRF8eyjiO9Vgr
       put(qnote, ["届いていない写真が", lost + "枚", "あります。", "下の", "「いますぐ送り直す」を", "押してください" + dot].concat(stay));
     } else if (waitN) {
       qnote.setAttribute("data-kind", "wait");
-      put(qnote, ["届いていない写真が", waitN + "枚。", "電波が戻ったら", "自動で送ります" + dot].concat(stay));
+      var rd = failed.some(function (q) { return (q.dr || 0) > 0; });   // 読み込み直しの写真がある＝「電波」と言わない（2026-11-16）
+      put(qnote, ["届いていない写真が", waitN + "枚。"].concat(rd ? ["少し待って", "自動で送り直します" + dot] : ["電波が戻ったら", "自動で送ります" + dot]).concat(stay));
     } else if (checkN) {
       qnote.setAttribute("data-kind", "wait");
       put(qnote, ["届いたか", "確かめています", "（" + checkN + "枚）" + dot].concat(stay));
